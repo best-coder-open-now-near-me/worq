@@ -50,7 +50,7 @@
             </Grid>
         </ScrollViewer>
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button HorizontalAlignment="Right" Width="100" Margin="5" Click="Save_Click">Save</Button>
+            <Button HorizontalAlignment="Left" Width="100" Margin="5, 5, 5, 5" Click="Save_Click">Save</Button>
             <Button HorizontalAlignment="Right" Width="100" Margin="5,5,10,5" Click="Cancel_Click">Cancel</Button>
         </StackPanel>
     </Grid>
