@@ -13,10 +13,5 @@ D:\Projects\GenericQueue\GenericQueue\obj\Debug\GenericQueue.csproj.GenerateReso
 D:\Projects\GenericQueue\GenericQueue\obj\Debug\GenericQueue.csproj.CoreCompileInputs.cache
 D:\Projects\GenericQueue\GenericQueue\obj\Debug\GenericQueue.exe
 D:\Projects\GenericQueue\GenericQueue\obj\Debug\GenericQueue.pdb
-D:\Projects\GenericQueue\GenericQueue\bin\Debug\EntityFramework.dll
-D:\Projects\GenericQueue\GenericQueue\bin\Debug\EntityFramework.SqlServer.dll
-D:\Projects\GenericQueue\GenericQueue\bin\Debug\EntityFramework.xml
-D:\Projects\GenericQueue\GenericQueue\bin\Debug\EntityFramework.SqlServer.xml
-D:\Projects\GenericQueue\GenericQueue\obj\Debug\GenericQueue.csproj.CopyComplete
 D:\Projects\GenericQueue\GenericQueue\obj\Debug\GeneratedInternalTypeHelper.g.cs
 D:\Projects\GenericQueue\GenericQueue\obj\Debug\Themes\Generic.baml
