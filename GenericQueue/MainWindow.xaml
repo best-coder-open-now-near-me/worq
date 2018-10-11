@@ -31,7 +31,8 @@
         </StackPanel>
         <DataGrid x:Name="FirstGrid" Grid.Row="1" SelectionMode="Single" VerticalAlignment="Top" IsReadOnly="False" RowDetailsVisibilityMode="VisibleWhenSelected" ItemsSource="{Binding}" EnableRowVirtualization="True" AutoGenerateColumns="False" SelectedIndex="-1">
         </DataGrid>
-        <ScrollViewer Grid.Row="2">
+        <Border Grid.Row="2" BorderBrush="Black" BorderThickness="1"></Border>
+        <ScrollViewer Grid.Row="2" BorderBrush="Black">
             <Grid Name="FieldsPanel" Visibility="Hidden" HorizontalAlignment="Left" VerticalAlignment="Top">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
