@@ -1,0 +1,56 @@
+﻿<Window x:Class="GenericQueue.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:GenericQueue"
+        mc:Ignorable="d"
+        Title="WorkQ" Height="450" Width="800" Loaded="Window_Loaded" WindowState="Maximized">
+    <Window.Resources>
+        <!--<CollectionViewSource x:Key="FirstGridSource" d:DesignSource="{d:DesignInstance {x:Type EFModel:Type}, CreateList=True}"/>-->
+        <DataTemplate x:Key="button_cell_template">
+            <Grid>
+                <Button></Button>
+            </Grid>
+            
+        </DataTemplate>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="1*"/>
+            <RowDefinition Height="1*"/>
+            <RowDefinition Height="auto"/>
+        </Grid.RowDefinitions>
+        <ComboBox Name="TypeDropdown" ItemsSource="{Binding}" HorizontalContentAlignment="Left" Margin="5" Text="    --Type--" IsEditable="True" IsReadOnly="True" Width="200" Grid.Row="0" HorizontalAlignment="Left" SelectionChanged="TypeDropdown_SelectionChanged"/>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right">
+            <TextBlock VerticalAlignment="Center">From:</TextBlock>
+            <DatePicker Height="25" Text="To:" HorizontalAlignment="Left" Margin="5,0,5,0" Name="FromDatePicker" VerticalAlignment="Center"/>
+            <TextBlock VerticalAlignment="Center" Margin="15,0,0,0">To:</TextBlock>
+            <DatePicker Height="25" Text="To:" HorizontalAlignment="Left" Margin="5,0,5,0" Name="ToDatePicker" VerticalAlignment="Center"/>
+        </StackPanel>
+        <DataGrid x:Name="FirstGrid" Grid.Row="1" SelectionMode="Single" VerticalAlignment="Top" IsReadOnly="False" RowDetailsVisibilityMode="VisibleWhenSelected" ItemsSource="{Binding}" EnableRowVirtualization="True" AutoGenerateColumns="False" SelectedIndex="-1">
+        </DataGrid>
+        <ScrollViewer Grid.Row="2">
+            <Grid Name="FieldsPanel" Visibility="Hidden" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <!--<Border Grid.Column="0" Grid.Row="0" Name="NameBorder" BorderBrush="Black" Background="LightGray" BorderThickness="1" HorizontalAlignment="Stretch" VerticalAlignment="Top">
+                    <TextBlock Margin="10,1,10,1" HorizontalAlignment="Center">Name</TextBlock>
+                </Border>
+                <Border Grid.Column="1" Grid.Row="0" Name="ValueBorder" BorderBrush="Black" Background="LightGray" BorderThickness="1" HorizontalAlignment="Stretch" VerticalAlignment="Top">
+                    <TextBlock Margin="10,1,10,1" HorizontalAlignment="Center">Value</TextBlock>
+                </Border>-->
+            </Grid>
+        </ScrollViewer>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button HorizontalAlignment="Right" Width="100" Margin="5" Click="Save_Click">Save</Button>
+            <Button HorizontalAlignment="Right" Width="100" Margin="5,5,10,5" Click="Cancel_Click">Cancel</Button>
+        </StackPanel>
+    </Grid>
+</Window>

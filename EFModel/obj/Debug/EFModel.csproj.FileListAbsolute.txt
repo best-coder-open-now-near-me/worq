@@ -1,0 +1,12 @@
+D:\Projects\GenericQueue\EFModel\bin\Debug\EFModel.dll.config
+D:\Projects\GenericQueue\EFModel\bin\Debug\EFModel.dll
+D:\Projects\GenericQueue\EFModel\bin\Debug\EFModel.pdb
+D:\Projects\GenericQueue\EFModel\bin\Debug\EntityFramework.dll
+D:\Projects\GenericQueue\EFModel\bin\Debug\EntityFramework.SqlServer.dll
+D:\Projects\GenericQueue\EFModel\bin\Debug\EntityFramework.xml
+D:\Projects\GenericQueue\EFModel\bin\Debug\EntityFramework.SqlServer.xml
+D:\Projects\GenericQueue\EFModel\obj\Debug\EFModel.csprojResolveAssemblyReference.cache
+D:\Projects\GenericQueue\EFModel\obj\Debug\EFModel.csproj.CoreCompileInputs.cache
+D:\Projects\GenericQueue\EFModel\obj\Debug\EFModel.csproj.CopyComplete
+D:\Projects\GenericQueue\EFModel\obj\Debug\EFModel.dll
+D:\Projects\GenericQueue\EFModel\obj\Debug\EFModel.pdb
