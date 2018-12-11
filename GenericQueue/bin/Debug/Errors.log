@@ -1,0 +1,299 @@
+10/18/2018 12:00:29 AM
+----- The connection was not closed. The connection's current state is open.
+----- 
+------------------------------------
+10/18/2018 12:02:55 AM
+----- There was an error reflecting type 'GenericQueue.EnumCollection'.
+----- System.InvalidOperationException: There was an error reflecting property 'Enums'. ---> System.InvalidOperationException: Cannot serialize member 'Enums' of type GenericQueue.Enum. XmlAttribute/XmlText cannot be used to encode complex types.
+   at System.Xml.Serialization.XmlReflectionImporter.ImportAccessorMapping(MemberMapping accessor, FieldModel model, XmlAttributes a, String ns, Type choiceIdentifierType, Boolean rpc, Boolean openModel, RecursionLimiter limiter)
+   at System.Xml.Serialization.XmlReflectionImporter.ImportFieldMapping(StructModel parent, FieldModel model, XmlAttributes a, String ns, RecursionLimiter limiter)
+   at System.Xml.Serialization.XmlReflectionImporter.InitializeStructMembers(StructMapping mapping, StructModel model, Boolean openModel, String typeName, RecursionLimiter limiter)
+   --- End of inner exception stack trace ---
+   at System.Xml.Serialization.XmlReflectionImporter.InitializeStructMembers(StructMapping mapping, StructModel model, Boolean openModel, String typeName, RecursionLimiter limiter)
+   at System.Xml.Serialization.XmlReflectionImporter.ImportStructLikeMapping(StructModel model, String ns, Boolean openModel, XmlAttributes a, RecursionLimiter limiter)
+   at System.Xml.Serialization.XmlReflectionImporter.ImportTypeMapping(TypeModel model, String ns, ImportContext context, String dataType, XmlAttributes a, Boolean repeats, Boolean openModel, RecursionLimiter limiter)
+------------------------------------
+10/18/2018 12:03:49 AM
+----- There was an error reflecting type 'GenericQueue.EnumCollection'.
+----- System.InvalidOperationException: There was an error reflecting property 'Enums'. ---> System.InvalidOperationException: Cannot serialize member 'Enums' of type GenericQueue.Enum. XmlAttribute/XmlText cannot be used to encode complex types.
+   at System.Xml.Serialization.XmlReflectionImporter.ImportAccessorMapping(MemberMapping accessor, FieldModel model, XmlAttributes a, String ns, Type choiceIdentifierType, Boolean rpc, Boolean openModel, RecursionLimiter limiter)
+   at System.Xml.Serialization.XmlReflectionImporter.ImportFieldMapping(StructModel parent, FieldModel model, XmlAttributes a, String ns, RecursionLimiter limiter)
+   at System.Xml.Serialization.XmlReflectionImporter.InitializeStructMembers(StructMapping mapping, StructModel model, Boolean openModel, String typeName, RecursionLimiter limiter)
+   --- End of inner exception stack trace ---
+   at System.Xml.Serialization.XmlReflectionImporter.InitializeStructMembers(StructMapping mapping, StructModel model, Boolean openModel, String typeName, RecursionLimiter limiter)
+   at System.Xml.Serialization.XmlReflectionImporter.ImportStructLikeMapping(StructModel model, String ns, Boolean openModel, XmlAttributes a, RecursionLimiter limiter)
+   at System.Xml.Serialization.XmlReflectionImporter.ImportTypeMapping(TypeModel model, String ns, ImportContext context, String dataType, XmlAttributes a, Boolean repeats, Boolean openModel, RecursionLimiter limiter)
+------------------------------------
+10/18/2018 12:06:44 AM
+----- There is an error in XML document (1, 2).
+----- System.InvalidOperationException: <Enums xmlns=''> was not expected.
+   at Microsoft.Xml.Serialization.GeneratedAssembly.XmlSerializationReaderFieldCollection.Read4_Details()
+------------------------------------
+10/18/2018 12:08:45 AM
+----- There is an error in XML document (1, 2).
+----- System.InvalidOperationException: <Enums xmlns=''> was not expected.
+   at Microsoft.Xml.Serialization.GeneratedAssembly.XmlSerializationReaderFieldCollection.Read4_Details()
+------------------------------------
+10/18/2018 12:13:34 AM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/18/2018 12:17:53 AM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/18/2018 1:41:23 AM
+----- '1' is not a valid value for property 'SelectedDate'.
+----- 
+------------------------------------
+10/18/2018 1:41:23 AM
+----- '11/12/2012' is not a valid value for property 'SelectedDate'.
+----- 
+------------------------------------
+10/18/2018 1:42:43 AM
+----- '11/12/2012' is not a valid value for property 'SelectedDate'.
+----- 
+------------------------------------
+10/18/2018 1:42:43 AM
+----- '11/12/2012' is not a valid value for property 'SelectedDate'.
+----- 
+------------------------------------
+10/18/2018 11:01:52 AM
+----- There is an error in XML document (0, 0).
+----- System.Xml.XmlException: Root element is missing.
+   at System.Xml.XmlTextReaderImpl.Throw(Exception e)
+   at System.Xml.XmlTextReaderImpl.ParseDocumentContent()
+   at System.Xml.XmlTextReaderImpl.Read()
+   at System.Xml.XmlTextReader.Read()
+   at System.Xml.XmlReader.MoveToContent()
+   at Microsoft.Xml.Serialization.GeneratedAssembly.XmlSerializationReaderEnumCollection.Read4_Enums()
+------------------------------------
+10/18/2018 11:08:51 AM
+----- Value cannot be null.
+Parameter name: source
+----- 
+------------------------------------
+10/18/2018 11:09:50 AM
+----- Value cannot be null.
+Parameter name: source
+----- 
+------------------------------------
+10/18/2018 11:11:16 AM
+----- Value cannot be null.
+Parameter name: source
+----- 
+------------------------------------
+10/18/2018 11:13:14 AM
+----- Value cannot be null.
+Parameter name: source
+----- 
+------------------------------------
+10/18/2018 11:13:42 AM
+----- Value cannot be null.
+Parameter name: source
+----- 
+------------------------------------
+10/18/2018 11:18:42 AM
+----- Sequence contains no elements
+----- 
+------------------------------------
+10/18/2018 1:18:03 PM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/18/2018 1:18:05 PM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/18/2018 2:38:49 PM
+----- 'System.Windows.Data.Binding' is not a valid value for property 'Background'.
+----- 
+------------------------------------
+10/18/2018 2:38:52 PM
+----- 'System.Windows.Data.Binding' is not a valid value for property 'Background'.
+----- 
+------------------------------------
+10/18/2018 2:39:58 PM
+----- 'System.Windows.Data.Binding' is not a valid value for property 'Background'.
+----- 
+------------------------------------
+10/18/2018 2:42:27 PM
+----- 'System.Windows.Data.Binding' is not a valid value for property 'Background'.
+----- 
+------------------------------------
+10/18/2018 2:46:22 PM
+----- 'System.Windows.Data.Binding' is not a valid value for property 'Background'.
+----- 
+------------------------------------
+10/18/2018 2:51:06 PM
+----- 'System.Windows.Data.Binding' is not a valid value for property 'Background'.
+----- 
+------------------------------------
+10/18/2018 2:52:25 PM
+----- 'System.Windows.Data.Binding' is not a valid value for property 'Foreground'.
+----- 
+------------------------------------
+10/18/2018 2:58:01 PM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/18/2018 3:02:32 PM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/18/2018 3:03:23 PM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/18/2018 3:03:28 PM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/18/2018 3:03:39 PM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/18/2018 3:05:40 PM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/18/2018 3:33:32 PM
+----- Token is not valid.
+----- 
+------------------------------------
+10/23/2018 3:39:29 PM
+----- Specified argument was out of the range of valid values.
+Parameter name: AncestorLevel cannot be set to less than 1.
+----- 
+------------------------------------
+10/23/2018 4:03:52 PM
+----- 'TextBlock' TargetType does not match type of element 'DataGridRow'.
+----- 
+------------------------------------
+10/23/2018 4:27:11 PM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/23/2018 4:36:02 PM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/23/2018 4:37:41 PM
+----- Unable to cast object of type 'System.Windows.Controls.TextBlock' to type 'System.Windows.Controls.ContentPresenter'.
+----- 
+------------------------------------
+10/24/2018 10:30:01 AM
+----- There is no row at position 0.
+----- 
+------------------------------------
+10/24/2018 10:30:17 AM
+----- There is no row at position 0.
+----- 
+------------------------------------
+10/24/2018 10:30:35 AM
+----- There is no row at position 0.
+----- 
+------------------------------------
+10/24/2018 10:30:40 AM
+----- There is no row at position 0.
+----- 
+------------------------------------
+10/24/2018 10:30:43 AM
+----- There is no row at position 0.
+----- 
+------------------------------------
+10/24/2018 10:30:48 AM
+----- There is no row at position 0.
+----- 
+------------------------------------
+10/24/2018 10:30:59 AM
+----- There is no row at position 0.
+----- 
+------------------------------------
+10/24/2018 10:31:03 AM
+----- There is no row at position 0.
+----- 
+------------------------------------
+10/24/2018 10:35:10 AM
+----- There is no row at position 0.
+----- 
+------------------------------------
+10/24/2018 10:35:19 AM
+----- There is no row at position 0.
+----- 
+------------------------------------
+10/24/2018 10:35:47 AM
+----- There is no row at position 0.
+----- 
+------------------------------------
+10/24/2018 10:40:11 AM
+----- Value cannot be null.
+Parameter name: uriString
+----- 
+------------------------------------
+10/24/2018 11:01:20 AM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/24/2018 11:06:40 AM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/24/2018 11:07:12 AM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/24/2018 11:07:57 AM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/24/2018 11:08:14 AM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/24/2018 11:09:09 AM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+10/24/2018 11:12:16 AM
+----- Value cannot be null.
+Parameter name: uriString
+----- 
+------------------------------------
+10/24/2018 11:23:02 AM
+----- The file 'C:\TEMP\d.pdf' already exists.
+----- 
+------------------------------------
+10/24/2018 11:24:02 AM
+----- Value cannot be null.
+Parameter name: dataGridRow
+----- 
+------------------------------------
+10/24/2018 11:24:11 AM
+----- Value cannot be null.
+Parameter name: dataGridRow
+----- 
+------------------------------------
+10/24/2018 11:24:18 AM
+----- Value cannot be null.
+Parameter name: dataGridRow
+----- 
+------------------------------------
+10/24/2018 11:24:22 AM
+----- Value cannot be null.
+Parameter name: dataGridRow
+----- 
+------------------------------------
+10/24/2018 11:24:49 AM
+----- Value cannot be null.
+Parameter name: dataGridRow
+----- 
+------------------------------------
+10/24/2018 2:02:36 PM
+----- The file 'C:\TEMP\d.pdf' already exists.
+----- 
+------------------------------------
+10/24/2018 2:02:56 PM
+----- The file 'C:\TEMP\d.pdf' already exists.
+----- 
+------------------------------------

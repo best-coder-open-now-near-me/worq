@@ -9,10 +9,21 @@ namespace GenericQueue
 {
     public class Enum
     {
-        [XmlAttribute("Value")]
-        public int Value { get; set; }
+        [XmlElement("Value")]
+        public string Value { get; set; }
 
-        [XmlAttribute("Label")]
+        [XmlElement("Label")]
         public string Label { get; set; }
+
+        [XmlElement("Name")]
+        public string Name { get; set; }
+    }
+
+
+    [XmlRootAttribute("Enums")]
+    public class EnumCollection
+    {
+        [XmlElement("Enum")]
+        public Enum[] Enums { get; set; }
     }
 }

@@ -1,0 +1,17 @@
+D:\Projects\GenericQueue\GenericQueue\bin\Release\GenericQueue.exe.config
+D:\Projects\GenericQueue\GenericQueue\bin\Release\GenericQueue.exe
+D:\Projects\GenericQueue\GenericQueue\bin\Release\GenericQueue.pdb
+D:\Projects\GenericQueue\GenericQueue\obj\Release\GenericQueue.csprojResolveAssemblyReference.cache
+D:\Projects\GenericQueue\GenericQueue\obj\Release\MainWindow.g.cs
+D:\Projects\GenericQueue\GenericQueue\obj\Release\App.g.cs
+D:\Projects\GenericQueue\GenericQueue\obj\Release\GeneratedInternalTypeHelper.g.cs
+D:\Projects\GenericQueue\GenericQueue\obj\Release\GenericQueue_MarkupCompile.cache
+D:\Projects\GenericQueue\GenericQueue\obj\Release\GenericQueue_MarkupCompile.lref
+D:\Projects\GenericQueue\GenericQueue\obj\Release\MainWindow.baml
+D:\Projects\GenericQueue\GenericQueue\obj\Release\Themes\Generic.baml
+D:\Projects\GenericQueue\GenericQueue\obj\Release\GenericQueue.g.resources
+D:\Projects\GenericQueue\GenericQueue\obj\Release\GenericQueue.Properties.Resources.resources
+D:\Projects\GenericQueue\GenericQueue\obj\Release\GenericQueue.csproj.GenerateResource.cache
+D:\Projects\GenericQueue\GenericQueue\obj\Release\GenericQueue.csproj.CoreCompileInputs.cache
+D:\Projects\GenericQueue\GenericQueue\obj\Release\GenericQueue.exe
+D:\Projects\GenericQueue\GenericQueue\obj\Release\GenericQueue.pdb

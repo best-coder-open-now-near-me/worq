@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -21,6 +22,10 @@ using System.Xml;
 using System.Xml.Serialization;
 using Microsoft.Win32;
 
+
+//known issues:
+//reset scroll bars to top//possibly fixed?
+
 namespace GenericQueue
 {
     public partial class MainWindow : Window
@@ -34,12 +39,34 @@ namespace GenericQueue
         DataTable ResponseDT = new DataTable();
         List<Field> OrderedFields = new List<Field>();
         string User = string.Empty;
-        private int ClickedRowID;
+        public int ClickedRowID { get; set; }
         private string ClickedContents;
         SqlConnection Connection;
+        DataSet TypeTable = new DataSet();
+        public int ActiveTypeIndex;
+        //public MainWindow GetMainWindow { get; private set; } = new MainWindow();
+
+        //public static readonly DependencyProperty IndexProperty = DependencyProperty.Register(
+        //"SelectedIndex",
+        //typeof(int),
+        //typeof(MainWindow),
+        //new UIPropertyMetadata(-1));
+
+        public int SelectedIndex;
+        public int DeselectedIndex;
+        public string UploadsFolder = string.Empty;
+
+
         public MainWindow()
         {
-            InitializeComponent();
+            try
+            {
+                InitializeComponent();
+            }
+            catch(Exception e)
+            {
+                LogError(e);
+            }
         }
 
         private static string AcquireConnectString()
@@ -56,7 +83,8 @@ namespace GenericQueue
                                 ";Initial Catalog=" + database +
                                 ";User Id=" + username +
                                 ";Password=" + password +
-                                ";Trusted_Connection=False";
+                                ";Trusted_Connection=False" +
+                                ";Connection Timeout=12000";
         }
 
         public static SqlConnection ConnectToDB()
@@ -64,453 +92,895 @@ namespace GenericQueue
             var ConnectionString = AcquireConnectString();
             SqlConnection Connection = new SqlConnection(ConnectionString);
             Connection.Open();
+
             return Connection;
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            Connection = ConnectToDB();
-            DataSet tableData = new DataSet();
-            SqlDataAdapter da = new SqlDataAdapter("Select * from Queue.dbo.Type", Connection);
-            SqlCommandBuilder cmdBuilder = new SqlCommandBuilder(da);
-            da.Fill(tableData);
+            try
+            {
+                DeselectedIndex = -1;
+                SelectedIndex = -1;
+                //GetMainWindow = this;
+                FromTB.Visibility = Visibility.Hidden;
+                ToTB.Visibility = Visibility.Hidden;
+                FromDatePicker.Visibility = Visibility.Hidden;
+                ToDatePicker.Visibility = Visibility.Hidden;
+                Connection = ConnectToDB();
+                TypeTable = new DataSet();
+                SqlDataAdapter da = new SqlDataAdapter("Select * from dbo.q_Type", Connection);
+                da.SelectCommand.CommandTimeout = 12000;
+                SqlCommandBuilder cmdBuilder = new SqlCommandBuilder(da);
+                
+                da.Fill(TypeTable);
 
-            User = Environment.UserName;
-            DataGrid dt = new DataGrid();
-            foreach (DataRow r in tableData.Tables[0].Rows)
-                TypeList.Add(r.ItemArray[1].ToString());
-            TypeDropdown.ItemsSource = TypeList;
+                User = Environment.UserName;
+                DataGrid dt = new DataGrid();
+                foreach (DataRow r in TypeTable.Tables[0].Rows)
+                    TypeList.Add(r.ItemArray[1].ToString());
+                TypeDropdown.ItemsSource = TypeList;
+            }
+            catch(Exception ex)
+            {
+                LogError(ex);
+            }
         }
 
         private void TypeDropdown_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            FieldsPanel.Children.Clear();
-            GetFirstGridData();
+            FillButton.IsEnabled = true;
         }
 
         private void GetFirstGridData()
         {
-            FirstDT = new DataTable();
-            SqlCommand cmd = new SqlCommand("Queue.dbo.q_Load_List", Connection);
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-            cmd.Parameters.Add(new SqlParameter("@user", User));
-            cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.SelectedValue.ToString()));
-            if (FromDatePicker.SelectedDate != null)
-                cmd.Parameters.Add(new SqlParameter("@date1", FromDatePicker.SelectedDate.ToString()));
-            if (ToDatePicker.SelectedDate != null)
-                cmd.Parameters.Add(new SqlParameter("@date2", ToDatePicker.SelectedDate.ToString()));
-            SqlDataReader rdr = cmd.ExecuteReader();
-            FirstDT.Load(rdr);
-            backupOne = FirstDT.Copy();
-            GenerateFirstGrid();
+            try
+            {
+                FirstDT = new DataTable();
+                SqlCommand cmd = new SqlCommand("dbo.q_Load_List", Connection);
+                cmd.CommandTimeout = 12000;
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.Parameters.Add(new SqlParameter("@user", User));
+                cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
+                if (FromDatePicker.SelectedDate != null)
+                    cmd.Parameters.Add(new SqlParameter("@date1", FromDatePicker.SelectedDate.ToString()));
+                if (ToDatePicker.SelectedDate != null)
+                    cmd.Parameters.Add(new SqlParameter("@date2", ToDatePicker.SelectedDate.ToString()));
+                SqlDataReader rdr = cmd.ExecuteReader();
+                FirstDT.Load(rdr);
+                backupOne = FirstDT.Copy();
+                GenerateFirstGrid();
+            }
+            catch(Exception ex)
+            {
+                LogError(ex);
+            }
         }
 
         private void GenerateFirstGrid(bool regenerating = false)
         {
-            if (regenerating)
-                FirstDT = backupOne.Copy();
-            FirstGrid.ItemsSource = null;
-            FirstGrid.Columns.Clear();
-            FirstGrid.Items.Clear();
-            FirstGrid.Items.Refresh();
-            List<string> colsToKeep = new List<string>();
-            for (int i = 0; i < FirstDT.Columns.Count; i++)
+            try
             {
-                if (FirstDT.Columns[i].ColumnName.StartsWith("button_"))
+                if (regenerating)
+                    FirstDT = backupOne.Copy();
+                DeselectedIndex = -1;
+                SelectedIndex = -1;
+                FirstGrid.ItemsSource = null;
+                FirstGrid.Columns.Clear();
+                FirstGrid.Items.Clear();
+                FirstGrid.Items.Refresh();
+                FieldsPanel.Children.Clear();
+                List<string> colsToKeep = new List<string>();
+                for (int i = 0; i < FirstDT.Columns.Count; i++)
                 {
-                    var label = FirstDT.Columns[i].ColumnName.Replace("button_", "");
-                    DataGridTemplateColumn col1 = new DataGridTemplateColumn();
-                    col1.Header = label;
-                    FrameworkElementFactory factory1 = new FrameworkElementFactory(typeof(ExButton));
-                    Binding b = new Binding(FirstDT.Columns[i].ColumnName);
-                    factory1.SetValue(ExButton.ContentProperty, label);
-                    factory1.SetValue(ExButton.TextProperty, b);
-                    factory1.SetValue(ExButton.IDProperty, b);
-                    factory1.AddHandler(Button.ClickEvent, (RoutedEventHandler)DG_Button_Click);
-                    DataTemplate cellTemplate1 = new DataTemplate();
-
-                    DataTrigger trig = new DataTrigger
+                    if (FirstDT.Columns[i].ColumnName.StartsWith("button_"))
                     {
-                        Binding = new Binding() { Path = new PropertyPath("Text"), RelativeSource = RelativeSource.Self },
-                        Value = string.Empty
-                    };
-                    Style style = new Style
+                        var label = FirstDT.Columns[i].ColumnName.Remove(0, 7);
+                        DataGridTemplateColumn col1 = new DataGridTemplateColumn();
+                        col1.Header = label;
+                        FrameworkElementFactory factory1 = new FrameworkElementFactory(typeof(ExButton));
+                        Binding b = new Binding(FirstDT.Columns[i].ColumnName);
+                        Binding b1 = new Binding("id");
+                        
+                        factory1.SetValue(ExButton.ContentProperty, label);
+                        factory1.SetValue(ExButton.TextProperty, b);
+                        factory1.SetValue(ExButton.IDProperty, b1);
+                        
+                        factory1.AddHandler(Button.ClickEvent, (RoutedEventHandler)DG_Button_Click);
+                        DataTemplate cellTemplate1 = new DataTemplate();
+
+                        DataTrigger trig = new DataTrigger
+                        {
+                            Binding = new Binding() { Path = new PropertyPath("Text"), RelativeSource = RelativeSource.Self },
+                            Value = string.Empty
+                        };
+                        Style style = new Style
+                        {
+                            TargetType = typeof(ExButton)
+                        };
+                        Setter setter = new Setter
+                        {
+                            Property = ExButton.VisibilityProperty,
+                            Value = Visibility.Hidden
+                        };
+                        trig.Setters.Add(setter);
+                        style.Triggers.Clear();
+                        style.Triggers.Add(trig);
+                        DataTrigger activeTrig = new DataTrigger
+                        {
+                            Binding = new Binding() { Path = new PropertyPath("IsActive"), RelativeSource = RelativeSource.Self },
+                            Value = true
+                        };
+                        Style activeStyle = new Style
+                        {
+                            TargetType = typeof(ExButton)
+                        };
+                        Setter activeSetter = new Setter
+                        {
+                            Property = TextBlock.TextDecorationsProperty,
+                            Value = TextDecorations.Underline
+                        };
+                        style.Triggers.Add(activeTrig);
+                        factory1.SetValue(ExButton.StyleProperty, style);
+                        cellTemplate1.Triggers.Add(trig);
+                        col1.CellTemplate = cellTemplate1;
+                        cellTemplate1.VisualTree = factory1;
+                        FirstGrid.Columns.Add(col1);
+                        continue;
+                    }
+                    if (FirstDT.Columns[i].ColumnName.StartsWith("document_"))
                     {
-                        TargetType = typeof(ExButton)
-                    };
-                    Setter setter = new Setter
+                        var label = FirstDT.Columns[i].ColumnName.Remove(0, 9);
+                        FrameworkElementFactory tbFactory = new FrameworkElementFactory(typeof(TextBlock));
+                        Binding b = new Binding(FirstDT.Columns[i].ColumnName);
+                        tbFactory.SetBinding(TextBlock.TextProperty, b);
+
+                        FrameworkElementFactory hyperlinkFactory = new FrameworkElementFactory(typeof(Hyperlink));
+                        hyperlinkFactory.AppendChild(tbFactory);
+                        hyperlinkFactory.SetBinding(Hyperlink.NavigateUriProperty, b);
+                        hyperlinkFactory.AddHandler(Hyperlink.ClickEvent, (RoutedEventHandler)DG_Hyperlink_Click);
+                        FrameworkElementFactory tb2Factory = new FrameworkElementFactory(typeof(TextBlock));
+                        tb2Factory.AppendChild(hyperlinkFactory);
+
+                        //FrameworkElementFactory browseButtonFactory = new FrameworkElementFactory(typeof(ExButton));
+                        //browseButtonFactory.SetValue(ExButton.ContentProperty, "Browse...");
+                        //browseButtonFactory.AddHandler(Button.ClickEvent, (RoutedEventHandler)DG_Browse_Click);
+                        //browseButtonFactory.SetValue(ExButton.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+                        //browseButtonFactory.SetBinding(ExButton.TextProperty, b);
+                        //DataTrigger trig = new DataTrigger
+                        //{
+                        //    Binding = new Binding() { Path = new PropertyPath("Text"), RelativeSource = RelativeSource.Self },
+                        //    Value = string.Empty
+                        //};
+                        //Style style = new Style
+                        //{
+                        //    TargetType = typeof(ExButton)
+                        //};
+                        //Setter setter = new Setter
+                        //{
+                        //    Property = ExButton.VisibilityProperty,
+                        //    Value = Visibility.Hidden
+                        //};
+                        //trig.Setters.Add(setter);
+                        //style.Triggers.Clear();
+                        //style.Triggers.Add(trig);
+                        //browseButtonFactory.SetValue(ExButton.StyleProperty, style);
+
+                        DataGridTemplateColumn dgc = new DataGridTemplateColumn();
+                        dgc.Header = label;
+                        dgc.Width = new DataGridLength(1, DataGridLengthUnitType.Auto);
+
+                        FrameworkElementFactory sb = new FrameworkElementFactory(typeof(StackPanel));
+                        sb.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+                        sb.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Left);
+                        sb.AppendChild(tb2Factory);
+                        Binding colorBinding = new Binding("color");
+                        colorBinding.Converter = new ColorConverter();
+                        sb.SetValue(StackPanel.BackgroundProperty, colorBinding);
+                        //sb.AppendChild(browseButtonFactory);
+                        DataTemplate dataTemplate = new DataTemplate { VisualTree = sb };
+                        //dataTemplate.Triggers.Add(trig);
+                        dgc.CellTemplate = dataTemplate;
+                        FirstGrid.Columns.Add(dgc);
+                        continue;
+                    }
+                    if (FirstDT.Columns[i].ColumnName == "id" || FirstDT.Columns[i].ColumnName.ToLower().Equals("color"))
                     {
-                        Property = ExButton.VisibilityProperty,
-                        Value = Visibility.Hidden
-                    };
-                    trig.Setters.Add(setter);
-                    style.Triggers.Clear();
-                    style.Triggers.Add(trig);
-                    factory1.SetValue(ExButton.StyleProperty, style);
-                    cellTemplate1.Triggers.Add(trig);
-                    col1.CellTemplate = cellTemplate1;
-                    cellTemplate1.VisualTree = factory1;
-                    FirstGrid.Columns.Add(col1);
-                    continue;
-                }
-                if (FirstDT.Columns[i].ColumnName.StartsWith("document_"))
-                {
-                    FrameworkElementFactory tbFactory = new FrameworkElementFactory(typeof(TextBlock));
-                    Binding b = new Binding(FirstDT.Columns[i].ColumnName);
-                    tbFactory.SetBinding(TextBlock.TextProperty, b);
+                        DataGridTextColumn col1 = new DataGridTextColumn();
+                        col1.Visibility = Visibility.Hidden;
+                        FirstGrid.Columns.Add(col1);
+                        continue;
+                    }
+                    if (FirstDT.Columns[i].DataType.Equals(typeof(Boolean)))
+                    {
+                        DataGridCheckBoxColumn col1 = new DataGridCheckBoxColumn();
+                        col1.Header = FirstDT.Columns[i].ColumnName;
+                        
+                        col1.Binding = new Binding(FirstDT.Columns[i].ColumnName);
+                        col1.IsReadOnly = true;
+                        FirstGrid.Columns.Add(col1);
+                        continue;
+                    }
+                    else
+                    {
+                        DataGridTextColumn col1 = new DataGridTextColumn();
+                        col1.Header = FirstDT.Columns[i].ColumnName;
 
-                    FrameworkElementFactory hyperlinkFactory = new FrameworkElementFactory(typeof(Hyperlink));
-                    hyperlinkFactory.AppendChild(tbFactory);
-                    hyperlinkFactory.SetBinding(Hyperlink.NavigateUriProperty, b);
-                    hyperlinkFactory.AddHandler(Hyperlink.ClickEvent, (RoutedEventHandler)DG_Hyperlink_Click);
-                    FrameworkElementFactory tb2Factory = new FrameworkElementFactory(typeof(TextBlock));
-                    tb2Factory.AppendChild(hyperlinkFactory);
+                        Binding colorBinding = new Binding("color");
+                        colorBinding.Converter = new ColorConverter();
 
-                    //FrameworkElementFactory browseButtonFactory = new FrameworkElementFactory(typeof(ExButton));
-                    //browseButtonFactory.SetValue(ExButton.ContentProperty, "Browse...");
-                    //browseButtonFactory.AddHandler(Button.ClickEvent, (RoutedEventHandler)DG_Browse_Click);
-                    //browseButtonFactory.SetValue(ExButton.HorizontalAlignmentProperty, HorizontalAlignment.Left);
-                    //browseButtonFactory.SetBinding(ExButton.TextProperty, b);
-                    //DataTrigger trig = new DataTrigger
-                    //{
-                    //    Binding = new Binding() { Path = new PropertyPath("Text"), RelativeSource = RelativeSource.Self },
-                    //    Value = string.Empty
-                    //};
-                    //Style style = new Style
-                    //{
-                    //    TargetType = typeof(ExButton)
-                    //};
-                    //Setter setter = new Setter
-                    //{
-                    //    Property = ExButton.VisibilityProperty,
-                    //    Value = Visibility.Hidden
-                    //};
-                    //trig.Setters.Add(setter);
-                    //style.Triggers.Clear();
-                    //style.Triggers.Add(trig);
-                    //browseButtonFactory.SetValue(ExButton.StyleProperty, style);
+                        Style columnStyle = new Style(typeof(TextBlock));
+                        columnStyle.Triggers.Clear();
+                        Setter s = new Setter(
+                                TextBlock.BackgroundProperty,
+                                colorBinding);
+                        columnStyle.Setters.Add(s);
 
-                    DataGridTemplateColumn dgc = new DataGridTemplateColumn();
-                    dgc.Header = FirstDT.Columns[i].ColumnName;
-                    dgc.Width = new DataGridLength(1, DataGridLengthUnitType.Auto);
 
-                    FrameworkElementFactory sb = new FrameworkElementFactory(typeof(StackPanel));
-                    sb.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
-                    sb.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Left);
-                    sb.AppendChild(tb2Factory);
-                    //sb.AppendChild(browseButtonFactory);
-                    DataTemplate dataTemplate = new DataTemplate { VisualTree = sb };
-                    //dataTemplate.Triggers.Add(trig);
-                    dgc.CellTemplate = dataTemplate;
-                    FirstGrid.Columns.Add(dgc);
-                    continue;
-                }
-                if (FirstDT.Columns[i].ColumnName == "id")
-                {
-                    DataGridTextColumn col1 = new DataGridTextColumn();
-                    col1.Visibility = Visibility.Hidden;
-                    FirstGrid.Columns.Add(col1);
-                    continue;
-                }
-                if (FirstDT.Columns[i].DataType.Equals(typeof(Boolean)))
-                {
-                    DataGridCheckBoxColumn col1 = new DataGridCheckBoxColumn();
-                    col1.Header = FirstDT.Columns[i].ColumnName;
-                    col1.Binding = new Binding(FirstDT.Columns[i].ColumnName);
-                    col1.IsReadOnly = true;
-                    FirstGrid.Columns.Add(col1);
-                    continue;
-                }
-                else
-                {
-                    DataGridTextColumn col1 = new DataGridTextColumn();
-                    col1.Header = FirstDT.Columns[i].ColumnName;
-                    col1.Binding = new Binding(FirstDT.Columns[i].ColumnName);
-                    col1.IsReadOnly = true;
-                    FirstGrid.Columns.Add(col1);
-                    continue;
-                }
+                        //DataTrigger activeTrig = new DataTrigger();
+                        //activeTrig.Binding = new Binding() { 
+                        //    RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(DataRowView), 1),
+                        //    Converter = new EqualityConverter(this) };
+                        //activeTrig.Value = true;
+                        ////{
+                        ////    Binding = new Binding() { Path = new PropertyPath("SelectedIndex"), ElementName = "QWindow" },//RelativeSource = RelativeSource.TemplatedParent },
+                        ////    Value = 1
+                        ////};
+                        //Style activeStyle = new Style
+                        //{
+                        //    TargetType = typeof(TextBlock)
+                        //};
+                        //Setter activeSetter = new Setter
+                        //{
+                        //    Property = TextBlock.TextDecorationsProperty,
+                        //    Value = TextDecorations.Underline
+                        //};
+                        //activeStyle.Setters.Add(activeSetter);
+                        //activeStyle.Triggers.Add(activeTrig);
+                        //activeStyle.Setters.Add(s);
+                        //col1.ElementStyle = columnStyle;
+                        col1.ElementStyle = columnStyle;// CellStyle.Triggers.Add(ac);
+                        ////col1.SetValue(DataGridTextColumn.ForegroundProperty, colorBinding);
+                        col1.Binding = new Binding(FirstDT.Columns[i].ColumnName);
+                        col1.IsReadOnly = true;
+                        FirstGrid.Columns.Add(col1);
+                        continue;
+                    }
 
+                }
+                FirstGrid.ItemsSource = FirstDT.DefaultView;
+                RowsCountTB.Text = FirstGrid.Items.Count.ToString();
+                
             }
-            FirstGrid.ItemsSource = FirstDT.DefaultView;
+            catch(Exception ex)
+            {
+                LogError(ex);
+            }
         }
 
         private void DG_Button_Click(object sender, RoutedEventArgs e)
         {
-            ClickedRowID = (sender as ExButton).ID;
-            ClickedContents = (sender as ExButton).Text;
-            SecondDT = new DataTable();
-            SqlCommand cmd = new SqlCommand("Queue.dbo.q_Load_Details", Connection);
-            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-            cmd.Parameters.Add(new SqlParameter("@user", User));
-            cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.SelectedValue));
-            cmd.Parameters.Add(new SqlParameter("@id", ClickedRowID));
-            cmd.Parameters.Add(new SqlParameter("@contents", ClickedContents));
-            SqlDataReader rdr = cmd.ExecuteReader();
-            SecondDT.Load(rdr);
-            backupTwo = SecondDT.Copy();
-            GenerateSecondGrid();
+            try
+            {
+                SelectedIndex = FirstGrid.SelectedIndex;
+                if (DeselectedIndex >= 0 && SelectedIndex != DeselectedIndex)
+                {
+
+                    var deselRow = (DataGridRow)FirstGrid.ItemContainerGenerator
+                                                     .ContainerFromIndex(DeselectedIndex);
+
+                    //DataGridCell cell = 
+                    for (int i = 0; i < FirstDT.Columns.Count; i++)
+                    {
+                        var item = FirstGrid.Columns[i].GetCellContent(deselRow);//.Parent;// as DataGridCell;
+                        if (item != null && item.GetType().Name.Equals(typeof(TextBlock).Name))
+                        {
+                            Binding colorBinding = new Binding("color");
+                            colorBinding.Converter = new ColorConverter();
+
+                            Style columnStyle = new Style(typeof(TextBlock));
+                            columnStyle.Triggers.Clear();
+                            Setter s = new Setter(
+                                    TextBlock.BackgroundProperty,
+                                    colorBinding);
+                            columnStyle.Setters.Add(s);
+
+
+                            //DataTrigger activeTrig = new DataTrigger();
+                            //activeTrig.Binding = new Binding() { 
+                            //    RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(DataRowView), 1),
+                            //    Converter = new EqualityConverter(this) };
+                            //activeTrig.Value = true;
+                            ////{
+                            ////    Binding = new Binding() { Path = new PropertyPath("SelectedIndex"), ElementName = "QWindow" },//RelativeSource = RelativeSource.TemplatedParent },
+                            ////    Value = 1
+                            ////};
+                            //Style activeStyle = new Style
+                            //{
+                            //    TargetType = typeof(TextBlock)
+                            //};
+                            //Setter activeSetter = new Setter
+                            //{
+                            //    Property = TextBlock.TextDecorationsProperty,
+                            //    Value = TextDecorations.Underline
+                            //};
+                            //activeStyle.Setters.Add(activeSetter);
+                            //activeStyle.Triggers.Add(activeTrig);
+                            //activeStyle.Setters.Add(s);
+                            //col1.ElementStyle = columnStyle;
+                            item.Style = columnStyle;
+                        }
+                    }
+                    //FirstGrid.UpdateLayout();
+                    //cell.Style = 
+                    // Applied logic
+                    //row.FontFamily = new FontFamily()
+                    deselRow.FontWeight = FontWeights.Normal;
+                    
+                    UpdateLayout();
+                }
+                DeselectedIndex = SelectedIndex;
+                ClickedRowID = (sender as ExButton).ID;
+                
+
+                //FirstGrid.AutoGeneratedColumns += (s, ex) =>
+                //{
+                //    FirstGrid.RowStyle..Columns[FirstGrid.Columns.Count - 1].CellStyle = this.Resources["CellStyle"] as Style;
+                //    FirstGrid.Columns[0].CellStyle = this.Resources["CellStyle"] as Style;
+                //};
+                //DataTrigger activeTrig = new DataTrigger();
+                //activeTrig.Binding = new Binding()
+                //{
+                //    RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(DataRowView), 1),
+                //    Converter = new EqualityConverter(this)
+                //};
+                //activeTrig.Value = true;
+                //{
+                //    Binding = new Binding() { Path = new PropertyPath("SelectedIndex"), ElementName = "QWindow" },//RelativeSource = RelativeSource.TemplatedParent },
+                //    Value = 1
+                //};
+                Style activeStyle = new Style
+                {
+                    TargetType = typeof(TextBlock)
+                };
+                Setter activeSetter = new Setter
+                {
+                    Property = TextBlock.TextDecorationsProperty,
+                    Value = TextDecorations.Underline
+                };
+                //Setter activeSetter2 = new Setter
+                //{
+                //    Property = TextBlock.TextDecorationsProperty,
+                //    //Value = TextDecorations.
+                //};
+                Binding cb = new Binding("color");
+                cb.Converter = new ColorConverter();
+
+                Setter s1 = new Setter(
+                                    TextBlock.BackgroundProperty,
+                                    cb);
+                activeStyle.Setters.Add(activeSetter);
+                activeStyle.Setters.Add(s1);
+
+                var row = (DataGridRow)FirstGrid.ItemContainerGenerator
+                                                 .ContainerFromIndex(SelectedIndex);
+
+                //DataGridCell cell = 
+                for(int i = 0; i < FirstDT.Columns.Count; i++)
+                {
+                    var item = FirstGrid.Columns[i].GetCellContent(row);//.Parent;// as DataGridCell;
+                    if (item != null && item.GetType().Name.Equals(typeof(TextBlock).Name))
+                    {
+                        item.Style = activeStyle;
+                    }
+                }
+                //FirstGrid.UpdateLayout();
+                //cell.Style = 
+                // Applied logic
+                //row.FontFamily = new FontFamily()
+                row.FontWeight = FontWeights.Bold;
+                //row.FontStyle = FontStyles.Oblique;
+                //col1.ElementStyle = columnStyle;
+                //.ElementStyle = activeStyle;
+                ClickedContents = (sender as ExButton).Text;
+                SecondDT = new DataTable();
+                SqlCommand cmd = new SqlCommand("dbo.q_Load_Details", Connection);
+                cmd.CommandTimeout = 12000;
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.Parameters.Add(new SqlParameter("@user", User));
+                cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
+                cmd.Parameters.Add(new SqlParameter("@id", ClickedRowID));
+                cmd.Parameters.Add(new SqlParameter("@contents", ClickedContents));
+                SqlDataReader rdr = cmd.ExecuteReader();
+                SecondDT.Load(rdr);
+                backupTwo = SecondDT.Copy();
+                GenerateSecondGrid();
+            }
+            catch(Exception ex)
+            {
+                LogError(ex);
+            }
             
         }
 
         private void GenerateSecondGrid(bool regenerating = false)
         {
-            if (SecondDT == null)
-                return;
-            if (regenerating)
-                SecondDT = backupTwo.Copy();
-            FieldsPanel.Children.Clear();
-
-            Border nb = new Border()
+            OrderedFields = new List<Field>();
+            try
             {
-                BorderBrush = Brushes.Black,
-                BorderThickness = new Thickness(1, 1, 1, 1),
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                Background = Brushes.LightGray
-            };
-            nb.Child = new TextBlock { Text = "Name", Margin = new Thickness(5, 3, 5, 3) };
-
-            Border vb = new Border()
-            {
-                BorderBrush = Brushes.Black,
-                BorderThickness = new Thickness(1, 1, 1, 1),
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                Background = Brushes.LightGray
-            };
-            vb.Child = new TextBlock { Text = "Value", Margin = new Thickness(5, 3, 5, 3) };
-            FieldsPanel.Children.Add(nb);
-            FieldsPanel.Children.Add(vb);
-            Grid.SetRow(nb, 0);
-            Grid.SetRow(vb, 0);
-            Grid.SetColumn(nb, 0);
-            Grid.SetColumn(vb, 1);
-
-            var xml = SecondDT.Rows[0].Field<string>("details").ToString().ToByteArray();
-            MemoryStream stream = new MemoryStream(xml);
-            using (TextReader reader = new StreamReader(stream))
-            {
-                XmlSerializer serializer = new XmlSerializer(typeof(FieldCollection));
-                var stuff = (FieldCollection)serializer.Deserialize(reader);
-                if (stuff.Fields.Count() > 0)
-                    FieldsPanel.Visibility = Visibility.Visible;
-                int i = 1;
-                var newList = stuff.Fields.ToList().OrderBy(f => f.Order).ToList();
-                newList.ForEach(s => OrderedFields.Add(s));
-                foreach (Field f in newList)
+                if (SecondDT == null || SecondDT.Rows.Count < 1)
+                    return;
+                if (regenerating)
+                    SecondDT = backupTwo.Copy();
+                FieldsPanel.Children.Clear();
+                FieldsPanelScroller.ScrollToHome();
+                SaveButton.IsEnabled = true;
+                CancelButton.IsEnabled = true;
+                Border nb = new Border()
                 {
-                    if (string.IsNullOrEmpty(f.Label))
-                        continue;
-                    FieldsPanel.RowDefinitions.Add(new RowDefinition());
+                    BorderBrush = Brushes.Black,
+                    BorderThickness = new Thickness(1, 1, 1, 1),
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    Background = Brushes.LightGray
+                };
+                nb.Child = new TextBlock { Text = "Name", Margin = new Thickness(5, 3, 5, 3) };
 
-                    Border b = new Border()
+                Border vb = new Border()
+                {
+                    BorderBrush = Brushes.Black,
+                    BorderThickness = new Thickness(1, 1, 1, 1),
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    Background = Brushes.LightGray
+                };
+                vb.Child = new TextBlock { Text = "Value", Margin = new Thickness(5, 3, 5, 3) };
+                FieldsPanel.Children.Add(nb);
+                FieldsPanel.Children.Add(vb);
+                Grid.SetRow(nb, 0);
+                Grid.SetRow(vb, 0);
+                Grid.SetColumn(nb, 0);
+                Grid.SetColumn(vb, 1);
+                EnumCollection enums = new EnumCollection();
+                var xml = SecondDT.Rows[0]?.Field<string>("details")?.ToString()?.ToByteArray();
+                var enumsXml = SecondDT.Rows[0]?.Field<string>("enums")?.ToString()?.ToByteArray();
+                MemoryStream stream = xml == null ? new MemoryStream() : new MemoryStream(xml);
+                MemoryStream enumStream = enumsXml == null ? new MemoryStream() : new MemoryStream(enumsXml);
+                using (TextReader reader = new StreamReader(stream), enumReader = new StreamReader(enumStream))
+                {
+                    if (reader.Peek() == -1)
+                        return;
+                    XmlSerializer serializer = new XmlSerializer(typeof(FieldCollection));
+                    var stuff = (FieldCollection)serializer.Deserialize(reader);
+                    
+                    if (stuff.Fields.Count() > 0)
+                        FieldsPanel.Visibility = Visibility.Visible;
+                    if (enumReader.Peek() != -1)
                     {
-                        BorderBrush = Brushes.Black,
-                        BorderThickness = new Thickness(1, 1, 1, 1),
-                        HorizontalAlignment = HorizontalAlignment.Stretch
-                    };
-                    b.Child = new TextBlock { Text = f.Label, Margin = new Thickness(5, 3, 5, 3) };
-                    FieldsPanel.Children.Add(b);
+                        XmlSerializer enumSerializer = new XmlSerializer(typeof(EnumCollection));
+                        enums = (EnumCollection)enumSerializer.Deserialize(enumReader);
 
-                    Border b1 = new Border()
+                    }
+
+                    int i = 0;
+                    var newList = stuff.Fields.ToList().OrderBy(f => f.Order).ToList();
+                    newList.ForEach(s => OrderedFields.Add(s));
+                    foreach (Field f in newList)
                     {
-                        BorderBrush = Brushes.Black,
-                        BorderThickness = new Thickness(1, 1, 1, 1),
-                        HorizontalAlignment = HorizontalAlignment.Stretch
-                    };
+                        i++;
+                        if (string.IsNullOrEmpty(f.Label))
+                            continue;
+                        FieldsPanel.RowDefinitions.Add(new RowDefinition());
+                        SolidColorBrush solidColorBrush = null;
+                        try
+                        {
+                            solidColorBrush = (SolidColorBrush)(new BrushConverter().ConvertFrom("#" + f.Color.ToLower()));
+                        }
+                        catch (Exception ex) { }
+                        Border b = new Border()
+                        {
+                            BorderBrush = Brushes.Black,
+                            BorderThickness = new Thickness(1, 1, 1, 1),
+                            HorizontalAlignment = HorizontalAlignment.Stretch,
+                            Background = solidColorBrush
+                        };
+                        b.Child = new TextBlock { Text = f.Label, Margin = new Thickness(5, 3, 5, 3) };
+                        FieldsPanel.Children.Add(b);
 
-                    object child = null;
+                        Border b1 = new Border()
+                        {
+                            BorderBrush = Brushes.Black,
+                            BorderThickness = new Thickness(1, 1, 1, 1),
+                            HorizontalAlignment = HorizontalAlignment.Stretch
+                        };
 
-                    if (f.DataType.ToLower().Equals("string"))
-                        if (f.ReadOnly.Equals(1) || f.ReadOnly.ToString().ToLower().Equals("true"))
-                            child = new TextBlock { Text = f.Value, Margin = new Thickness(3, 0, 5, 0), Padding = new Thickness(5, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center };
-                        else
-                            child = new TextBox { Text = f.Value, Padding = new Thickness(5, 1, 5, 1), VerticalAlignment = VerticalAlignment.Center };
+                        object child = null;
 
-                    else if (f.DataType.ToLower().Equals("enum"))
-                    {
-                        if (!f.ReadOnly)
-                            child = new ComboBox
+                        if (f.DataType.ToLower().Equals("string"))
+                            if (f.ReadOnly.Equals(1) || f.ReadOnly.ToString().ToLower().Equals("true"))
+                                child = new TextBlock { Text = f.Value, Margin = new Thickness(3, 0, 5, 0), Padding = new Thickness(5, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center };
+                            else
+                                child = new TextBox { Text = f.Value, Padding = new Thickness(5, 1, 5, 1), VerticalAlignment = VerticalAlignment.Center };
+
+                        else if (f.DataType.ToLower().Equals("enum"))
+                        {
+                            var source = enums.Enums?.ToList().Where(e => e.Name.Equals(f.Name))?.ToList();
+
+                            var selected = source == null ? null : source.Where(e => e.Value.Equals(f.Value))?.FirstOrDefault();
+
+                            if (!f.ReadOnly)
                             {
-                                ItemsSource = f.Enums,
-                                DisplayMemberPath = "Label",
-                                SelectedItem = f.Enums.Where(en => en.Value.ToString().Equals(f.Value)).FirstOrDefault(),
-                                IsHitTestVisible = !f.ReadOnly,
-                            };
-                        else
-                            child = new TextBlock { Text = f.Enums.Where(en => en.Value.ToString().Equals(f.Value)).Select(p => p.Label).FirstOrDefault(), Margin = new Thickness(3, 0, 5, 0), Padding = new Thickness(5, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center };
+                                
+                                child = new ComboBox
+                                {
+                                    ItemsSource = source,
+                                    DisplayMemberPath = "Label",
+                                    SelectedItem = selected,
+                                    IsHitTestVisible = !f.ReadOnly,
+                                };
+                            }
+                            else
+                                child = new TextBlock { Text = source == null ? "" : source.Where(e => e.Value.Equals(f.Value))?.Select(p => p.Label).FirstOrDefault(), Margin = new Thickness(3, 0, 5, 0), Padding = new Thickness(5, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center };
+                        }
+
+
+                        else if (f.DataType.ToLower().Equals("path"))
+                            child = GetLinkCell(f);
+
+                        else if (f.DataType.ToLower().Equals("date"))
+                            child = GetDateCell(f);
+
+                        else if (f.DataType.ToLower().Equals("bool") || f.DataType.ToLower().Equals("boolean"))
+                        {
+                            child = new CheckBox { IsChecked = f.Value.Equals("true") || f.Value.Equals("1") ? true : false, IsHitTestVisible = !f.ReadOnly, VerticalAlignment = VerticalAlignment.Center };
+                            if (f.ReadOnly)
+                                b1.SetValue(BackgroundProperty, Brushes.LightGray);
+                        }
+
+
+                        if (child != null)
+                            b1.Child = (UIElement)child;
+                        FieldsPanel.Children.Add(b1);
+                        Grid.SetRow(b, i);
+                        Grid.SetRow(b1, i);
+                        Grid.SetColumn(b, 0);
+                        Grid.SetColumn(b1, 1);
                     }
-                    
-
-                    else if (f.DataType.ToLower().Equals("path"))
-                        child = GetLinkCell(f);
-
-                    else if (f.DataType.ToLower().Equals("bool") || f.DataType.ToLower().Equals("boolean"))
-                    {
-                        child = new CheckBox { IsChecked = f.Value.Equals("true") || f.Value.Equals("1") ? true : false, IsHitTestVisible = !f.ReadOnly, VerticalAlignment = VerticalAlignment.Center };
-                        if (f.ReadOnly)
-                            b1.SetValue(BackgroundProperty, Brushes.LightGray);
-                    }
-                    
-
-                    if (child != null)
-                        b1.Child = (UIElement)child;
-                    FieldsPanel.Children.Add(b1);
-                    Grid.SetRow(b, i);
-                    Grid.SetRow(b1, i);
-                    Grid.SetColumn(b, 0);
-                    Grid.SetColumn(b1, 1);
-                    i++;
                 }
+            }
+            catch(Exception ex)
+            {
+                LogError(ex);
+            }
+        }
+
+        private DatePicker GetDateCell(Field f)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(f.Value))
+                    return new DatePicker { };
+                StackPanel sp = new StackPanel();
+                sp.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+                DatePicker calendar = new DatePicker();
+                calendar.SelectedDate = DateTime.Parse(f.Value);
+                calendar.IsEnabled = !f.ReadOnly;
+                //Calendar calendar = new Calendar();
+                //calendar.SetValue(DatePicker.SelectedDateProperty, f.Value);
+                //if (f.ReadOnly)
+                //{
+                //    calendar.SetValue(DatePicker.IsHitTestVisibleProperty, f.ReadOnly);
+                //}
+                
+                //Hyperlink hl = new Hyperlink();
+                //Uri uri = new Uri(f.Value);
+                //hl.SetValue(Hyperlink.NavigateUriProperty, uri);
+                //hl.Inlines.Add(textBlock);
+                //hl.AddHandler(Hyperlink.ClickEvent, (RoutedEventHandler)DG_Hyperlink_Click);
+                //TextBlock tb = new TextBlock();
+                //tb.Inlines.Add(hl);
+                //tb.Margin = new Thickness(5, 0, 10, 0);
+                //tb.VerticalAlignment = VerticalAlignment.Center;
+                //Button b = new Button();
+                //b.HorizontalAlignment = HorizontalAlignment.Right;
+                //b.Content = "Browse...";
+                //b.AddHandler(Button.ClickEvent, (RoutedEventHandler)DG_Browse_Click);
+                //if (!f.ReadOnly)
+                //    sp.Children.Add(b);
+                //sp.Children.Add(calendar);
+
+                return calendar;
+            }
+            catch(Exception ex)
+            {
+                LogError(ex);
+                return null;
             }
         }
 
         private StackPanel GetLinkCell(Field f)
         {
-            if (string.IsNullOrEmpty(f.Value))
-                return new StackPanel { };
-            TextBlock textBlock = new TextBlock();
-            textBlock.SetValue(TextBlock.TextProperty, f.Value);
-            StackPanel sp = new StackPanel();
-            sp.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
-            Hyperlink hl = new Hyperlink();
-            Uri uri = new Uri(f.Value);
-            hl.SetValue(Hyperlink.NavigateUriProperty, uri);
-            hl.Inlines.Add(textBlock);
-            hl.AddHandler(Hyperlink.ClickEvent, (RoutedEventHandler)DG_Hyperlink_Click);
-            TextBlock tb = new TextBlock();
-            tb.Inlines.Add(hl);
-            tb.Margin = new Thickness(5, 0, 10, 0);
-            tb.VerticalAlignment = VerticalAlignment.Center;
-            Button b = new Button();
-            b.HorizontalAlignment = HorizontalAlignment.Right;
-            b.Content = "Browse...";
-            b.AddHandler(Button.ClickEvent, (RoutedEventHandler)DG_Browse_Click);
-            if (!f.ReadOnly)
-                sp.Children.Add(b);
-            sp.Children.Add(tb);
-            
-            return sp;
+            try
+            {
+                StackPanel sp = new StackPanel();
+                Button b = new Button();
+                
+                b.Content = "Browse...";
+                b.AddHandler(Button.ClickEvent, (RoutedEventHandler)DG_Browse_Click);
+                if (!f.ReadOnly)
+                    sp.Children.Add(b);
+                //if (!string.IsNullOrEmpty(f.Value))
+                //{
+                TextBlock textBlock = new TextBlock();
+                    textBlock.SetValue(TextBlock.TextProperty, f?.Value);
+                    
+                    sp.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+                    Hyperlink hl = new Hyperlink();
+                if (!string.IsNullOrEmpty(f.Value))
+                {
+                    Uri uri = new Uri(f?.Value);
+                    hl.SetValue(Hyperlink.NavigateUriProperty, uri);
+                }
+                    
+                    hl.Inlines.Add(textBlock);
+                    hl.AddHandler(Hyperlink.ClickEvent, (RoutedEventHandler)DG_Hyperlink_Click);
+                    TextBlock tb = new TextBlock();
+                    tb.Inlines.Add(hl);
+                    tb.Margin = new Thickness(5, 0, 10, 0);
+                    tb.VerticalAlignment = VerticalAlignment.Center;
+                    sp.Children.Add(tb);
+                //}
+                //else
+                    //b.HorizontalAlignment = HorizontalAlignment.Left;
+
+
+
+                return sp;
+            }
+            catch(Exception ex)
+            {
+                LogError(ex);
+                return null;
+            }
         }
 
         private void DG_Browse_Click(object sender, RoutedEventArgs e)
         {
-            var s = ((sender as Button).Parent as StackPanel).Children.OfType<TextBlock>().FirstOrDefault();
-            OpenFileDialog dialog = new OpenFileDialog();
-            var result = dialog.ShowDialog();
-            if ((bool)result) 
+            try
             {
-                s.Inlines.Clear();
-                Hyperlink hl = new Hyperlink();
-                Uri uri = new Uri(dialog.FileName);
-                hl.SetValue(Hyperlink.NavigateUriProperty, uri);
-                hl.Inlines.Add(dialog.FileName);
-                hl.AddHandler(Hyperlink.ClickEvent, (RoutedEventHandler)DG_Hyperlink_Click);
-                s.Inlines.Add(hl);
+                var s = ((sender as Button).Parent as StackPanel).Children.OfType<TextBlock>().FirstOrDefault();
+                OpenFileDialog dialog = new OpenFileDialog();
+                var result = dialog.ShowDialog();
+                if ((bool)result)
+                {
+                    s?.Inlines?.Clear();
+                    Hyperlink hl = new Hyperlink();
+                    var newPath = dialog.FileName;
+                    if (!string.IsNullOrEmpty(UploadsFolder))
+                    {
+                        newPath = System.IO.Path.Combine(UploadsFolder, System.IO.Path.GetFileName(dialog.FileName));
+                        File.Copy(dialog.FileName, newPath);
+                    }
+
+                    Uri uri = new Uri(newPath);
+                    hl.SetValue(Hyperlink.NavigateUriProperty, uri);
+                    hl.Inlines.Add(newPath);
+                    hl.AddHandler(Hyperlink.ClickEvent, (RoutedEventHandler)DG_Hyperlink_Click);
+                    s.Inlines.Add(hl);
+                }
+            }
+            catch(Exception ex)
+            {
+                LogError(ex);
             }
         }
 
         private void DG_Hyperlink_Click(object sender, RoutedEventArgs e)
         {
-            Hyperlink link = (Hyperlink)e.OriginalSource;
-            Process.Start(link.NavigateUri.LocalPath);
+            try
+            {
+                Hyperlink link = (Hyperlink)e.OriginalSource;
+                Process.Start(link.NavigateUri.LocalPath);
+            }
+            catch(Exception ex)
+            {
+                LogError(ex);
+            }
         }
 
         private void Save_Click(object sender, RoutedEventArgs e)
         {
-            if (SecondDT == null)
-                return;
-            List<Field> f = new List<Field>();
-            Dictionary<string, string> dic = new Dictionary<string, string>();
-            var childrenEnumerator = FieldsPanel.Children.GetEnumerator();
-            while (childrenEnumerator.MoveNext())
+            try
             {
-                var current = childrenEnumerator.Current;
-                var c = Grid.GetColumn(current as UIElement);
-                var r = Grid.GetRow(current as UIElement);
-                if (r != 0)
+                if (SecondDT == null)
+                    return;
+                List<Field> f = new List<Field>();
+                Dictionary<string, string> dic = new Dictionary<string, string>();
+                var childrenEnumerator = FieldsPanel.Children.GetEnumerator();
+                while (childrenEnumerator.MoveNext())
                 {
-                    if (r > OrderedFields.Count)
-                        continue;
-                    if (c == 1)
+                    var current = childrenEnumerator.Current;
+                    var c = Grid.GetColumn(current as UIElement);
+                    var r = Grid.GetRow(current as UIElement);
+                    if (r != 0)
                     {
-                        DependencyProperty dp = TextBlock.TextProperty;
-                        var chi = (current as Border).Child;
-                        string v = string.Empty;
-                        if (chi.GetType().Name.Equals(typeof(ComboBox).Name))
+                        if (r > OrderedFields.Count)
+                            continue;
+                        if (c == 1)
                         {
-                            dp = ComboBox.SelectedValueProperty;
-                            v = (chi.GetValue(dp) as Enum).Value.ToString();
-                        }
-                        else if (chi.GetType().Name.Equals(typeof(CheckBox).Name))
-                        {
-                            dp = CheckBox.IsCheckedProperty;
-                            v = chi.GetValue(dp).ToString();
-                        }
-                        else if (chi.GetType().Name.Equals(typeof(StackPanel).Name))
-                        {
-                            var hl = (chi as StackPanel).Children.OfType<TextBlock>().FirstOrDefault();
-                            if (hl == null)
-                                continue;
-                            v = (hl.Inlines.FirstInline as Hyperlink).NavigateUri.ToString().Replace("file:///", "");
-                        }
-                        else
-                        {
-                            var fieldtest = OrderedFields.ElementAt<Field>(r - 1);
-                            if (!fieldtest.ReadOnly)
-                                dp = TextBox.TextProperty;
-                            v = chi.GetValue(dp).ToString();
+                            DependencyProperty dp = TextBlock.TextProperty;
+                            var chi = (current as Border).Child;
+                            string v = string.Empty;
+                            if (chi.GetType().Name.Equals(typeof(ComboBox).Name))
+                            {
+                                dp = ComboBox.SelectedValueProperty;
+                                v = (chi.GetValue(dp) as Enum)?.Value?.ToString();
+                            }
+                            else if (chi.GetType().Name.Equals(typeof(CheckBox).Name))
+                            {
+                                dp = CheckBox.IsCheckedProperty;
+                                v = chi.GetValue(dp)?.ToString();
+                            }
+                            else if (chi.GetType().Name.Equals(typeof(DatePicker).Name))
+                            {
+                                dp = DatePicker.SelectedDateProperty;
+                                var i = ((DateTime)chi.GetValue(dp));
+                                v = i != null ? i.Date != null ? i.Date.ToString("MM/dd/yyyy") : "" : "";
+                            }
+                            else if (chi.GetType().Name.Equals(typeof(StackPanel).Name))
+                            {
+                                var hl = (chi as StackPanel).Children.OfType<TextBlock>().FirstOrDefault();
+                                if (hl == null)
+                                    continue;
+                                v = (hl.Inlines.FirstInline as Hyperlink)?.NavigateUri?.ToString().Replace("/", "\\").Remove(0, 5);
+                                Regex rgx = new Regex(@"[A-Z]:\\");
+                                
+                                if (!string.IsNullOrEmpty(v))
+                                {
+                                    var result = rgx.Match(v, 0);
+                                    string rem = string.Empty;
+                                    if (result != null && result.Success == true)
+                                    {
+                                        rem = v.Remove(0, result.Index);
+                                        v = rem;
+                                    }
+                                    
+                                }
+                                   
+                            }
+                            else
+                            {
+                                var fieldtest = OrderedFields.ElementAt<Field>(r - 1);
+                                if (!fieldtest.ReadOnly)
+                                    dp = TextBox.TextProperty;
+                                v = chi.GetValue(dp)?.ToString();
+                            }
+
+                            var field = OrderedFields.ElementAt<Field>(r - 1);
+                            field.Value = v != null ? v : "";
+                            f.Add(field);
                         }
 
-                        var field = OrderedFields.ElementAt<Field>(r - 1);
-                        field.Value = v;
-                        f.Add(field);
                     }
 
                 }
 
-            }
-
-            using (var sww = new StringWriter())
-            {
-                using (XmlWriter writer = XmlWriter.Create(sww))
+                using (var sww = new StringWriter())
                 {
-                    ResponseDT = new DataTable();
-                    FieldCollection c = new FieldCollection();
-                    c.Fields = f.ToArray();
-                    XmlSerializer serializer = new XmlSerializer(typeof(FieldCollection));
-                    serializer.Serialize(writer, c);
-                    var x = sww.ToString();
+                    using (XmlWriter writer = XmlWriter.Create(sww))
+                    {
+                        ResponseDT = new DataTable();
+                        FieldCollection c = new FieldCollection();
+                        c.Fields = f.ToArray();
+                        XmlSerializer serializer = new XmlSerializer(typeof(FieldCollection));
+                        serializer.Serialize(writer, c);
+                        var x = sww.ToString();
 
-                    ResponseDT = new DataTable();
-                    SqlCommand cmd = new SqlCommand("Queue.dbo.q_Save_Details", Connection);
-                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
-                    cmd.Parameters.Add(new SqlParameter("@user", User));
-                    cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.SelectedValue));
-                    cmd.Parameters.Add(new SqlParameter("@id", ClickedRowID));
-                    cmd.Parameters.Add(new SqlParameter("@contents", ClickedContents));
-                    cmd.Parameters.Add(new SqlParameter("@xml", x));
-                    SqlDataReader rdr = cmd.ExecuteReader();
-                    ResponseDT.Load(rdr);
+                        ResponseDT = new DataTable();
+                        SqlCommand cmd = new SqlCommand("dbo.q_Save_Details", Connection);
+                        cmd.CommandTimeout = 12000;
+                        cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                        cmd.Parameters.Add(new SqlParameter("@user", User));
+                        cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
+                        cmd.Parameters.Add(new SqlParameter("@id", ClickedRowID));
+                        cmd.Parameters.Add(new SqlParameter("@contents", ClickedContents));
+                        cmd.Parameters.Add(new SqlParameter("@xml", x));
+                        SqlDataReader rdr = cmd.ExecuteReader();
+                        ResponseDT.Load(rdr);
+
+                    }
 
                 }
-
+                var message = ResponseDT.Rows[0][1].ToString();
+                if (!string.IsNullOrEmpty(message))
+                    MessageBox.Show(message);
+                var refresh = ResponseDT.Rows[0][0].ToString();
+                if (refresh.Equals("True"))
+                    GetFirstGridData();
             }
-            var message = ResponseDT.Rows[0][1].ToString();
-            if (!string.IsNullOrEmpty(message))
-                MessageBox.Show(message);
-            var refresh = ResponseDT.Rows[0][0].ToString();
-            if (refresh.Equals("True"))
-                GetFirstGridData();
+            catch(Exception ex)
+            {
+                LogError(ex);
+            }
         }
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
-            if(SecondDT != null)
+            try
             {
-                GenerateSecondGrid(regenerating: true);
+                if (SecondDT != null)
+                {
+                    GenerateSecondGrid(regenerating: true);
+                }
+            }
+            catch(Exception ex)
+            {
+                LogError(ex);
             }
         }
 
+        public static void LogError(Exception error)
+        {
+            try
+            {
+                string lP = System.IO.Path.Combine(Environment.CurrentDirectory, "Errors.log");
+                if (!File.Exists(lP))
+                    File.Create(lP);
+
+                StreamWriter writer = new StreamWriter(lP, append: true);
+                writer.WriteLine(System.DateTime.Now.ToString());
+                writer.WriteLine("----- " + error.Message);
+                writer.WriteLine("----- " + error.InnerException);
+                writer.WriteLine("------------------------------------");
+                writer.Close();
+                MessageBox.Show(error.Message + "\n" + error.InnerException);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Exception while writing to error log" + e);
+            }
+        }
+
+        private void FillButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ActiveTypeIndex = TypeDropdown.SelectedIndex;
+                ClickedRowID = -1;
+                SelectedIndex = -1;
+                DeselectedIndex = -1;
+                FillButton.IsEnabled = true;
+                FromDatePicker.SelectedDate = null;
+                ToDatePicker.SelectedDate = null;
+                FromTB.Visibility = Visibility.Hidden;
+                ToTB.Visibility = Visibility.Hidden;
+                FromDatePicker.Visibility = Visibility.Hidden;
+                ToDatePicker.Visibility = Visibility.Hidden;
+                UploadsFolder = string.Empty;
+                foreach (DataRow r in TypeTable.Tables[0].Rows)
+                {
+                    if (r.ItemArray[1].ToString().Equals(TypeDropdown.Items[ActiveTypeIndex].ToString()))
+                    {
+                        if (r.ItemArray[2] != null && !string.IsNullOrEmpty(r.ItemArray[2].ToString()) && Boolean.Parse(r.ItemArray[2].ToString()))
+                        {
+                            FromTB.Visibility = Visibility.Visible;
+                            ToTB.Visibility = Visibility.Visible;
+                            FromDatePicker.Visibility = Visibility.Visible;
+                            ToDatePicker.Visibility = Visibility.Visible;
+                        }
+                        UploadsFolder = r.ItemArray[3] != null && !string.IsNullOrEmpty(r.ItemArray[3].ToString()) ? r.ItemArray[3].ToString() : string.Empty;
+                    }
+
+                }
+                FieldsPanel.Children.Clear();
+                SaveButton.IsEnabled = false;
+                CancelButton.IsEnabled = false;
+                //GetFirstGridData();
+            }
+            catch (Exception ex)
+            {
+                LogError(ex);
+            }
+            GetFirstGridData();
+        }
     }
 
     static class Helper

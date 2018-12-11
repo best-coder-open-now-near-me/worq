@@ -12,9 +12,9 @@ namespace GenericQueue
         public string Label { get; set; }
         public string DataType { get; set; }
         public string Value { get; set; }
-        public float Order { get; set; }
+        public double Order { get; set; }
         public bool ReadOnly { get; set; }
         public int ID { get; set; }
-        public Enum[] Enums { get; set; }
+        public string Color { get; set; }
     }
 }
