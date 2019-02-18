@@ -751,12 +751,17 @@ namespace GenericQueue
                 var result = dialog.ShowDialog();
                 if ((bool)result)
                 {
-                    s?.Inlines?.Clear();
+                    
                     Hyperlink hl = new Hyperlink();
                     var newPath = dialog.FileName;
                     if (!string.IsNullOrEmpty(UploadsFolder))
                     {
                         newPath = System.IO.Path.Combine(UploadsFolder, System.IO.Path.GetFileName(dialog.FileName));
+                        if (File.Exists(newPath))
+                        {
+                            newPath = System.IO.Path.Combine(UploadsFolder, System.IO.Path.GetFileNameWithoutExtension(dialog.FileName) + DateTime.Now.ToString("-MMddyyHHmmss") + System.IO.Path.GetExtension(dialog.FileName));
+                        }
+                        s?.Inlines?.Clear();
                         File.Copy(dialog.FileName, newPath);
                     }
 
