@@ -21,7 +21,11 @@ using System.Windows.Shapes;
 using System.Xml;
 using System.Xml.Serialization;
 using Microsoft.Win32;
-
+using System.Collections.Specialized;
+using System.Collections;
+//using Excel = Microsoft.Office.Interop.Excel;
+using Excel;//DataReader;
+using CsvHelper;
 
 //known issues:
 //reset scroll bars to top//possibly fixed?
@@ -44,18 +48,14 @@ namespace GenericQueue
         SqlConnection Connection;
         DataSet TypeTable = new DataSet();
         public int ActiveTypeIndex;
-        //public MainWindow GetMainWindow { get; private set; } = new MainWindow();
 
-        //public static readonly DependencyProperty IndexProperty = DependencyProperty.Register(
-        //"SelectedIndex",
-        //typeof(int),
-        //typeof(MainWindow),
-        //new UIPropertyMetadata(-1));
 
         public int SelectedIndex;
         public int DeselectedIndex;
         public string UploadsFolder = string.Empty;
-
+        public int ButtonID;
+        public bool AllowProcessAll = true;
+        public bool AllowImport = true;
 
         public MainWindow()
         {
@@ -63,7 +63,7 @@ namespace GenericQueue
             {
                 InitializeComponent();
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 LogError(e);
             }
@@ -103,16 +103,16 @@ namespace GenericQueue
                 DeselectedIndex = -1;
                 SelectedIndex = -1;
                 //GetMainWindow = this;
-                FromTB.Visibility = Visibility.Hidden;
-                ToTB.Visibility = Visibility.Hidden;
-                FromDatePicker.Visibility = Visibility.Hidden;
-                ToDatePicker.Visibility = Visibility.Hidden;
+                FromTB.Visibility = Visibility.Collapsed;
+                ToTB.Visibility = Visibility.Collapsed;
+                FromDatePicker.Visibility = Visibility.Collapsed;
+                ToDatePicker.Visibility = Visibility.Collapsed;
                 Connection = ConnectToDB();
                 TypeTable = new DataSet();
                 SqlDataAdapter da = new SqlDataAdapter("Select * from dbo.q_Type", Connection);
                 da.SelectCommand.CommandTimeout = 12000;
                 SqlCommandBuilder cmdBuilder = new SqlCommandBuilder(da);
-                
+
                 da.Fill(TypeTable);
 
                 User = Environment.UserName;
@@ -120,8 +120,9 @@ namespace GenericQueue
                 foreach (DataRow r in TypeTable.Tables[0].Rows)
                     TypeList.Add(r.ItemArray[1].ToString());
                 TypeDropdown.ItemsSource = TypeList;
+                Connection.Close();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogError(ex);
             }
@@ -137,6 +138,7 @@ namespace GenericQueue
             try
             {
                 FirstDT = new DataTable();
+                Connection.Open();
                 SqlCommand cmd = new SqlCommand("dbo.q_Load_List", Connection);
                 cmd.CommandTimeout = 12000;
                 cmd.CommandType = System.Data.CommandType.StoredProcedure;
@@ -149,9 +151,12 @@ namespace GenericQueue
                 SqlDataReader rdr = cmd.ExecuteReader();
                 FirstDT.Load(rdr);
                 backupOne = FirstDT.Copy();
+                Connection.Close();
+
                 GenerateFirstGrid();
+                
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogError(ex);
             }
@@ -165,6 +170,7 @@ namespace GenericQueue
                     FirstDT = backupOne.Copy();
                 DeselectedIndex = -1;
                 SelectedIndex = -1;
+                ButtonID = -1;
                 FirstGrid.ItemsSource = null;
                 FirstGrid.Columns.Clear();
                 FirstGrid.Items.Clear();
@@ -175,17 +181,18 @@ namespace GenericQueue
                 {
                     if (FirstDT.Columns[i].ColumnName.StartsWith("button_"))
                     {
+                        ButtonID = i;
                         var label = FirstDT.Columns[i].ColumnName.Remove(0, 7);
                         DataGridTemplateColumn col1 = new DataGridTemplateColumn();
                         col1.Header = label;
                         FrameworkElementFactory factory1 = new FrameworkElementFactory(typeof(ExButton));
                         Binding b = new Binding(FirstDT.Columns[i].ColumnName);
                         Binding b1 = new Binding("id");
-                        
+
                         factory1.SetValue(ExButton.ContentProperty, label);
                         factory1.SetValue(ExButton.TextProperty, b);
                         factory1.SetValue(ExButton.IDProperty, b1);
-                        
+
                         factory1.AddHandler(Button.ClickEvent, (RoutedEventHandler)DG_Button_Click);
                         DataTemplate cellTemplate1 = new DataTemplate();
 
@@ -295,7 +302,7 @@ namespace GenericQueue
                     {
                         DataGridCheckBoxColumn col1 = new DataGridCheckBoxColumn();
                         col1.Header = FirstDT.Columns[i].ColumnName;
-                        
+
                         col1.Binding = new Binding(FirstDT.Columns[i].ColumnName);
                         col1.IsReadOnly = true;
                         FirstGrid.Columns.Add(col1);
@@ -350,12 +357,43 @@ namespace GenericQueue
                 }
                 FirstGrid.ItemsSource = FirstDT.DefaultView;
                 RowsCountTB.Text = FirstGrid.Items.Count.ToString();
-                
+
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogError(ex);
             }
+        }
+
+        private void DGButton(DataRow row)
+        {
+            try
+            {
+                ClickedRowID = (int)row.ItemArray[FirstDT.Columns["id"].Ordinal];
+                ClickedContents = row.ItemArray[FirstDT.Columns[ButtonID].Ordinal].ToString();
+                //ClickedContents = row.ItemArray[FirstDT.Columns.Ordinal].ToString();
+                //ClickedRowID = (sender as ExButton).ID;
+                //ClickedContents = (sender as ExButton).Text;
+                SecondDT = new DataTable();
+                Connection.Open();
+                SqlCommand cmd = new SqlCommand("dbo.q_Load_Details", Connection);
+                cmd.CommandTimeout = 12000;
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.Parameters.Add(new SqlParameter("@user", User));
+                cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
+                cmd.Parameters.Add(new SqlParameter("@id", ClickedRowID));
+                cmd.Parameters.Add(new SqlParameter("@contents", ClickedContents));
+                SqlDataReader rdr = cmd.ExecuteReader();
+                SecondDT.Load(rdr);
+                backupTwo = SecondDT.Copy();
+                Connection.Close();
+                //GenerateSecondGrid();
+            }
+            catch (Exception ex)
+            {
+                LogError(ex);
+            }
+
         }
 
         private void DG_Button_Click(object sender, RoutedEventArgs e)
@@ -416,12 +454,12 @@ namespace GenericQueue
                     // Applied logic
                     //row.FontFamily = new FontFamily()
                     deselRow.FontWeight = FontWeights.Normal;
-                    
+
                     UpdateLayout();
                 }
                 DeselectedIndex = SelectedIndex;
                 ClickedRowID = (sender as ExButton).ID;
-                
+
 
                 //FirstGrid.AutoGeneratedColumns += (s, ex) =>
                 //{
@@ -466,7 +504,7 @@ namespace GenericQueue
                                                  .ContainerFromIndex(SelectedIndex);
 
                 //DataGridCell cell = 
-                for(int i = 0; i < FirstDT.Columns.Count; i++)
+                for (int i = 0; i < FirstDT.Columns.Count; i++)
                 {
                     var item = FirstGrid.Columns[i].GetCellContent(row);//.Parent;// as DataGridCell;
                     if (item != null && item.GetType().Name.Equals(typeof(TextBlock).Name))
@@ -484,6 +522,7 @@ namespace GenericQueue
                 //.ElementStyle = activeStyle;
                 ClickedContents = (sender as ExButton).Text;
                 SecondDT = new DataTable();
+                Connection.Open();
                 SqlCommand cmd = new SqlCommand("dbo.q_Load_Details", Connection);
                 cmd.CommandTimeout = 12000;
                 cmd.CommandType = System.Data.CommandType.StoredProcedure;
@@ -494,13 +533,16 @@ namespace GenericQueue
                 SqlDataReader rdr = cmd.ExecuteReader();
                 SecondDT.Load(rdr);
                 backupTwo = SecondDT.Copy();
+                Connection.Close();
+
                 GenerateSecondGrid();
+                
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogError(ex);
             }
-            
+
         }
 
         private void GenerateSecondGrid(bool regenerating = false)
@@ -550,7 +592,7 @@ namespace GenericQueue
                         return;
                     XmlSerializer serializer = new XmlSerializer(typeof(FieldCollection));
                     var stuff = (FieldCollection)serializer.Deserialize(reader);
-                    
+
                     if (stuff.Fields.Count() > 0)
                         FieldsPanel.Visibility = Visibility.Visible;
                     if (enumReader.Peek() != -1)
@@ -608,7 +650,7 @@ namespace GenericQueue
 
                             if (!f.ReadOnly)
                             {
-                                
+
                                 child = new ComboBox
                                 {
                                     ItemsSource = source,
@@ -646,7 +688,7 @@ namespace GenericQueue
                     }
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogError(ex);
             }
@@ -669,7 +711,7 @@ namespace GenericQueue
                 //{
                 //    calendar.SetValue(DatePicker.IsHitTestVisibleProperty, f.ReadOnly);
                 //}
-                
+
                 //Hyperlink hl = new Hyperlink();
                 //Uri uri = new Uri(f.Value);
                 //hl.SetValue(Hyperlink.NavigateUriProperty, uri);
@@ -689,7 +731,7 @@ namespace GenericQueue
 
                 return calendar;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogError(ex);
                 return null;
@@ -702,7 +744,7 @@ namespace GenericQueue
             {
                 StackPanel sp = new StackPanel();
                 Button b = new Button();
-                
+
                 b.Content = "Browse...";
                 b.AddHandler(Button.ClickEvent, (RoutedEventHandler)DG_Browse_Click);
                 if (!f.ReadOnly)
@@ -710,32 +752,32 @@ namespace GenericQueue
                 //if (!string.IsNullOrEmpty(f.Value))
                 //{
                 TextBlock textBlock = new TextBlock();
-                    textBlock.SetValue(TextBlock.TextProperty, f?.Value);
-                    
-                    sp.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
-                    Hyperlink hl = new Hyperlink();
+                textBlock.SetValue(TextBlock.TextProperty, f?.Value);
+
+                sp.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+                Hyperlink hl = new Hyperlink();
                 if (!string.IsNullOrEmpty(f.Value))
                 {
                     Uri uri = new Uri(f?.Value);
                     hl.SetValue(Hyperlink.NavigateUriProperty, uri);
                 }
-                    
-                    hl.Inlines.Add(textBlock);
-                    hl.AddHandler(Hyperlink.ClickEvent, (RoutedEventHandler)DG_Hyperlink_Click);
-                    TextBlock tb = new TextBlock();
-                    tb.Inlines.Add(hl);
-                    tb.Margin = new Thickness(5, 0, 10, 0);
-                    tb.VerticalAlignment = VerticalAlignment.Center;
-                    sp.Children.Add(tb);
+
+                hl.Inlines.Add(textBlock);
+                hl.AddHandler(Hyperlink.ClickEvent, (RoutedEventHandler)DG_Hyperlink_Click);
+                TextBlock tb = new TextBlock();
+                tb.Inlines.Add(hl);
+                tb.Margin = new Thickness(5, 0, 10, 0);
+                tb.VerticalAlignment = VerticalAlignment.Center;
+                sp.Children.Add(tb);
                 //}
                 //else
-                    //b.HorizontalAlignment = HorizontalAlignment.Left;
+                //b.HorizontalAlignment = HorizontalAlignment.Left;
 
 
 
                 return sp;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogError(ex);
                 return null;
@@ -751,7 +793,7 @@ namespace GenericQueue
                 var result = dialog.ShowDialog();
                 if ((bool)result)
                 {
-                    
+
                     Hyperlink hl = new Hyperlink();
                     var newPath = dialog.FileName;
                     if (!string.IsNullOrEmpty(UploadsFolder))
@@ -772,7 +814,7 @@ namespace GenericQueue
                     s.Inlines.Add(hl);
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogError(ex);
             }
@@ -785,9 +827,82 @@ namespace GenericQueue
                 Hyperlink link = (Hyperlink)e.OriginalSource;
                 Process.Start(link.NavigateUri.LocalPath);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogError(ex);
+            }
+        }
+
+        private bool Save()
+        {
+            try
+            {
+                List<Field> f = new List<Field>();
+                string v = string.Empty;
+                var i = SecondDT.Columns.Count;
+                for (int j = 1; j < i - 1; j++)
+                {
+                    foreach (DataRow row in SecondDT.Rows)
+                    {
+
+                        v = row.ItemArray[j].ToString();
+                        var field = OrderedFields.ElementAt<Field>(j - 1);
+                        field.Value = v ?? "";
+                        f.Add(field);
+                    }
+                }
+
+                using (var sww = new StringWriter())
+                {
+                    using (XmlWriter writer = XmlWriter.Create(sww))
+                    {
+                        ResponseDT = new DataTable();
+                        FieldCollection c = new FieldCollection();
+                        c.Fields = f.ToArray();
+                        XmlSerializer serializer = new XmlSerializer(typeof(FieldCollection));
+                        serializer.Serialize(writer, c);
+                        var x = sww.ToString();
+
+                        ResponseDT = new DataTable();
+                        Connection.Open();
+                        SqlCommand cmd = new SqlCommand("dbo.q_Save_Details", Connection);
+                        cmd.CommandTimeout = 12000;
+                        cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                        cmd.Parameters.Add(new SqlParameter("@user", User));
+                        cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
+                        cmd.Parameters.Add(new SqlParameter("@id", ClickedRowID));
+                        cmd.Parameters.Add(new SqlParameter("@contents", ClickedContents));
+                        cmd.Parameters.Add(new SqlParameter("@xml", x));
+                        SqlDataReader rdr = cmd.ExecuteReader();
+                        ResponseDT.Load(rdr);
+                        Connection.Close();
+                    }
+
+                }
+                var message = ResponseDT.Rows[0][1].ToString();
+                if (!string.IsNullOrEmpty(message))
+                {
+                    MessageBox.Show(message);
+                    MessageBoxResult dialogResult = MessageBox.Show("Press 'Yes' to modify and resubmit this item, 'No' to skip it.", "Choose your own adventure.", MessageBoxButton.YesNo);
+                    if (dialogResult == MessageBoxResult.Yes)
+                    {
+                        return true;
+                    }
+                    else if (dialogResult == MessageBoxResult.No)
+                    {
+                        return false;
+                    }
+                }
+                return false;
+                //var refresh = ResponseDT.Rows[0][0].ToString();
+                //if (refresh.Equals("True"))
+                //    GetFirstGridData();
+            }
+            catch (Exception ex)
+            {
+                LogError(ex);
+                MessageBox.Show("Something went wrong. Check error log for more details.");
+                return true;
             }
         }
 
@@ -837,7 +952,7 @@ namespace GenericQueue
                                     continue;
                                 v = (hl.Inlines.FirstInline as Hyperlink)?.NavigateUri?.ToString().Replace("/", "\\").Remove(0, 5);
                                 Regex rgx = new Regex(@"[A-Z]:\\");
-                                
+
                                 if (!string.IsNullOrEmpty(v))
                                 {
                                     var result = rgx.Match(v, 0);
@@ -847,9 +962,9 @@ namespace GenericQueue
                                         rem = v.Remove(0, result.Index);
                                         v = rem;
                                     }
-                                    
+
                                 }
-                                   
+
                             }
                             else
                             {
@@ -880,6 +995,7 @@ namespace GenericQueue
                         var x = sww.ToString();
 
                         ResponseDT = new DataTable();
+                        Connection.Open();
                         SqlCommand cmd = new SqlCommand("dbo.q_Save_Details", Connection);
                         cmd.CommandTimeout = 12000;
                         cmd.CommandType = System.Data.CommandType.StoredProcedure;
@@ -890,7 +1006,7 @@ namespace GenericQueue
                         cmd.Parameters.Add(new SqlParameter("@xml", x));
                         SqlDataReader rdr = cmd.ExecuteReader();
                         ResponseDT.Load(rdr);
-
+                        Connection.Close();
                     }
 
                 }
@@ -901,7 +1017,7 @@ namespace GenericQueue
                 if (refresh.Equals("True"))
                     GetFirstGridData();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogError(ex);
             }
@@ -916,7 +1032,7 @@ namespace GenericQueue
                     GenerateSecondGrid(regenerating: true);
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 LogError(ex);
             }
@@ -955,15 +1071,26 @@ namespace GenericQueue
                 FillButton.IsEnabled = true;
                 FromDatePicker.SelectedDate = null;
                 ToDatePicker.SelectedDate = null;
-                FromTB.Visibility = Visibility.Hidden;
-                ToTB.Visibility = Visibility.Hidden;
-                FromDatePicker.Visibility = Visibility.Hidden;
-                ToDatePicker.Visibility = Visibility.Hidden;
+                FromTB.Visibility = Visibility.Collapsed;
+                ToTB.Visibility = Visibility.Collapsed;
+                FromDatePicker.Visibility = Visibility.Collapsed;
+                ToDatePicker.Visibility = Visibility.Collapsed;
+                ProcessAllButton.Visibility = Visibility.Collapsed;
+                AllowImportButton.Visibility = Visibility.Collapsed;
+
                 UploadsFolder = string.Empty;
                 foreach (DataRow r in TypeTable.Tables[0].Rows)
                 {
                     if (r.ItemArray[1].ToString().Equals(TypeDropdown.Items[ActiveTypeIndex].ToString()))
                     {
+                        if (!string.IsNullOrEmpty(r.ItemArray[4]?.ToString()))
+                            if ((bool)r.ItemArray[4])
+                                ProcessAllButton.Visibility = Visibility.Visible;
+
+                        if (!string.IsNullOrEmpty(r.ItemArray[5]?.ToString()))
+                            if ((bool)r.ItemArray[5])
+                                AllowImportButton.Visibility = Visibility.Visible;
+
                         if (r.ItemArray[2] != null && !string.IsNullOrEmpty(r.ItemArray[2].ToString()) && Boolean.Parse(r.ItemArray[2].ToString()))
                         {
                             FromTB.Visibility = Visibility.Visible;
@@ -985,6 +1112,130 @@ namespace GenericQueue
                 LogError(ex);
             }
             GetFirstGridData();
+        }
+
+        private void ProcessAllButton_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (DataRow item in FirstDT.Rows)
+            {
+                DGButton(item);
+                if (Save())
+                {
+                    GenerateFirstGrid();
+                    break;
+                }
+
+            }
+        }
+
+        private void AllowImportButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                OpenFileDialog dialog = new OpenFileDialog();
+                dialog.Filter = "csv files(*.csv)|*.csv";
+                dialog.Multiselect = false;
+                var result = dialog.ShowDialog();
+                if ((bool)result)
+                {
+                    ProcessImport(dialog.FileName);
+                }
+            }
+            catch (Exception ex) { LogError(ex); }
+        }
+
+        private void ProcessImport(string fileName)
+        {
+            try
+            {
+                string q = string.Empty;
+                string temp;
+
+                using (var reader = new StreamReader(fileName))
+                using (var csv = new CsvReader(reader))
+                {
+
+                    using (var dr = new CsvDataReader(csv))
+                    {
+                        DataRow cols;
+
+                        int currentRow = 0;
+                        int maxcols = 0;
+
+                        var inputTable = new DataTable();
+                        inputTable.Load(dr);
+
+                        try
+                        {
+                            cols = inputTable.Rows[currentRow];
+                            temp = string.Empty;// "[csv_path] VARCHAR(MAX)";
+
+                            maxcols = cols.ItemArray.Length;
+
+                            for (int i = 0; i < cols.ItemArray.Length; i++)
+                            {
+                                temp += "[" + inputTable.Columns[i] + "] VARCHAR(MAX),";
+                            }
+                            temp = temp.TrimEnd(',');
+                            q = "CREATE TABLE #t (" + temp + ")";
+                            Connection.Open();
+                            SqlCommand myCommand = new SqlCommand(q, Connection);
+                            myCommand.ExecuteNonQuery();
+                            StringBuilder query = new StringBuilder(8192);
+                            for (; currentRow < inputTable.Rows.Count; currentRow++)
+                            {
+                                cols = inputTable.Rows[currentRow];
+
+                                query.Append("INSERT INTO #t VALUES");
+                                query.Append("('");
+
+                                for (int j = 0; j < maxcols; j++)
+                                {
+
+                                    if (j < cols.ItemArray.Length)
+                                        query.Append(cols.ItemArray[j].ToString());
+
+                                    query.Append('\'');
+                                    query.Append(",'");
+                                }
+                                query.Remove(query.Length - 2, 2);
+                                query.Append(')');
+                                query.Append(';');
+
+                                SqlCommand command = new SqlCommand(query.ToString(), Connection);
+                                command.ExecuteNonQuery();
+                                
+                            }
+                            inputTable.Dispose();
+
+                            //-------------------------------
+                            FirstDT = new DataTable();
+                            SqlCommand cmd = new SqlCommand("dbo.q_Load_Import", Connection);
+                            cmd.CommandTimeout = 12000;
+                            cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                            cmd.Parameters.Add(new SqlParameter("@user", User));
+                            cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
+                            if (FromDatePicker.SelectedDate != null)
+                                cmd.Parameters.Add(new SqlParameter("@date1", FromDatePicker.SelectedDate.ToString()));
+                            if (ToDatePicker.SelectedDate != null)
+                                cmd.Parameters.Add(new SqlParameter("@date2", ToDatePicker.SelectedDate.ToString()));
+                            cmd.ExecuteNonQuery();
+
+                            Connection.Close();
+
+                            GetFirstGridData();
+                        }
+                        catch (Exception e)
+                        {
+                            LogError(e);
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                LogError(e);
+            }
         }
     }
 

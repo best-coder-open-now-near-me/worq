@@ -15,3 +15,14 @@ D:\Projects\GenericQueue\GenericQueue\obj\Debug\GenericQueue.exe
 D:\Projects\GenericQueue\GenericQueue\obj\Debug\GenericQueue.pdb
 D:\Projects\GenericQueue\GenericQueue\obj\Debug\GeneratedInternalTypeHelper.g.cs
 D:\Projects\GenericQueue\GenericQueue\obj\Debug\Themes\Generic.baml
+D:\Projects\GenericQueue\GenericQueue\bin\Debug\Excel.dll
+D:\Projects\GenericQueue\GenericQueue\bin\Debug\ExcelDataReader.dll
+D:\Projects\GenericQueue\GenericQueue\bin\Debug\ICSharpCode.SharpZipLib.dll
+D:\Projects\GenericQueue\GenericQueue\bin\Debug\Excel.pdb
+D:\Projects\GenericQueue\GenericQueue\bin\Debug\ExcelDataReader.pdb
+D:\Projects\GenericQueue\GenericQueue\bin\Debug\ExcelDataReader.xml
+D:\Projects\GenericQueue\GenericQueue\obj\Debug\GenericQueue.csproj.CopyComplete
+D:\Projects\GenericQueue\GenericQueue\bin\Debug\CsvHelper.dll
+D:\Projects\GenericQueue\GenericQueue\bin\Debug\System.ValueTuple.dll
+D:\Projects\GenericQueue\GenericQueue\bin\Debug\CsvHelper.xml
+D:\Projects\GenericQueue\GenericQueue\bin\Debug\System.ValueTuple.xml

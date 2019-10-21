@@ -297,3 +297,43 @@ Parameter name: dataGridRow
 ----- The file 'C:\TEMP\d.pdf' already exists.
 ----- 
 ------------------------------------
+8/12/2019 3:56:13 PM
+----- Object reference not set to an instance of an object.
+----- 
+------------------------------------
+8/12/2019 4:40:23 PM
+----- There is no row at position 0.
+----- 
+------------------------------------
+8/13/2019 11:05:51 AM
+----- There is no row at position 0.
+----- 
+------------------------------------
+8/13/2019 11:14:22 AM
+----- There is no row at position 0.
+----- 
+------------------------------------
+8/13/2019 11:25:35 AM
+----- Index was out of range. Must be non-negative and less than the size of the collection.
+Parameter name: index
+----- 
+------------------------------------
+8/13/2019 11:26:45 AM
+----- Index was out of range. Must be non-negative and less than the size of the collection.
+Parameter name: index
+----- 
+------------------------------------
+8/13/2019 11:26:49 AM
+----- Index was out of range. Must be non-negative and less than the size of the collection.
+Parameter name: index
+----- 
+------------------------------------
+8/13/2019 11:27:01 AM
+----- Index was out of range. Must be non-negative and less than the size of the collection.
+Parameter name: index
+----- 
+------------------------------------
+10/17/2019 6:44:04 PM
+----- ExecuteReader requires an open and available Connection. The connection's current state is closed.
+----- 
+------------------------------------

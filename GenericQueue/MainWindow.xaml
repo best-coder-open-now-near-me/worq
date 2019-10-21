@@ -26,17 +26,18 @@
         </Grid.RowDefinitions>
         <StackPanel Orientation="Horizontal">
             <ComboBox Name="TypeDropdown" ItemsSource="{Binding}" HorizontalContentAlignment="Left" Margin="5" Text="    --Type--" IsEditable="True" IsReadOnly="True" Width="200" Grid.Row="0" HorizontalAlignment="Left" SelectionChanged="TypeDropdown_SelectionChanged"/>
-            <Button Name="FillButton" Margin="5,5,5,5" Width="60" HorizontalAlignment="Left" Click="FillButton_Click" IsEnabled="False">Fill</Button>
+            <Button Name="FillButton" Margin="5,5,5,5" Width="55" HorizontalAlignment="Left" Click="FillButton_Click" IsEnabled="False">Fill</Button>
             <TextBlock Margin="5,5,5,5" VerticalAlignment="Center">Row Count:</TextBlock>
             <TextBlock Name="RowsCountTB" Margin="0,5,5,5" VerticalAlignment="Center"></TextBlock>
         </StackPanel>
         
         <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right">
-            
-            <TextBlock Name="FromTB" VerticalAlignment="Center">From:</TextBlock>
-            <DatePicker Height="25" Text="To:" HorizontalAlignment="Left" Margin="5,0,5,0" Name="FromDatePicker" VerticalAlignment="Center"/>
-            <TextBlock Name="ToTB" VerticalAlignment="Center" Margin="15,0,0,0">To:</TextBlock>
-            <DatePicker Height="25" Text="To:" HorizontalAlignment="Left" Margin="5,0,5,0" Name="ToDatePicker" VerticalAlignment="Center"/>
+            <Button Height="25" Margin="5,5,5,5" Name="ProcessAllButton" VerticalAlignment="Center" Visibility="Collapsed" Width="80" Click="ProcessAllButton_Click">Process All</Button>
+            <Button Height="25" Margin="5,5,5,5" Name="AllowImportButton" VerticalAlignment="Center" Visibility="Collapsed" Width="80" Click="AllowImportButton_Click">Import</Button>
+            <TextBlock Name="FromTB" VerticalAlignment="Center" Visibility="Collapsed">From:</TextBlock>
+            <DatePicker Height="25" Text="To:" HorizontalAlignment="Left" Margin="5,0,5,0" Name="FromDatePicker" VerticalAlignment="Center" Visibility="Collapsed"/>
+            <TextBlock Name="ToTB" VerticalAlignment="Center" Margin="15,0,0,0" Visibility="Collapsed">To:</TextBlock>
+            <DatePicker Height="25" Text="To:" HorizontalAlignment="Left" Margin="5,0,5,0" Name="ToDatePicker" VerticalAlignment="Center" Visibility="Collapsed"/>
         </StackPanel>
         <DataGrid x:Name="FirstGrid" Grid.Row="1" SelectionMode="Single" SelectionUnit="FullRow" CanUserAddRows="False" VerticalScrollBarVisibility="Visible" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" IsReadOnly="False" RowDetailsVisibilityMode="VisibleWhenSelected" ItemsSource="{Binding}" EnableRowVirtualization="False" EnableColumnVirtualization="False" AutoGenerateColumns="False" SelectedIndex="-1">
         </DataGrid>
