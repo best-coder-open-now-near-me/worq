@@ -39,7 +39,7 @@
             <TextBlock Name="ToTB" VerticalAlignment="Center" Margin="15,0,0,0" Visibility="Collapsed">To:</TextBlock>
             <DatePicker Height="25" Text="To:" HorizontalAlignment="Left" Margin="5,0,5,0" Name="ToDatePicker" VerticalAlignment="Center" Visibility="Collapsed"/>
         </StackPanel>
-        <DataGrid x:Name="FirstGrid" Grid.Row="1" SelectionMode="Single" SelectionUnit="FullRow" CanUserAddRows="False" VerticalScrollBarVisibility="Visible" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" IsReadOnly="False" RowDetailsVisibilityMode="VisibleWhenSelected" ItemsSource="{Binding}" EnableRowVirtualization="False" EnableColumnVirtualization="False" AutoGenerateColumns="False" SelectedIndex="-1">
+        <DataGrid x:Name="FirstGrid" Grid.Row="1" SelectionMode="Single" SelectionUnit="FullRow" CanUserAddRows="False" CanUserSortColumns="True" VerticalScrollBarVisibility="Visible" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" IsReadOnly="False" RowDetailsVisibilityMode="VisibleWhenSelected" ItemsSource="{Binding}" EnableRowVirtualization="False" EnableColumnVirtualization="False" AutoGenerateColumns="False" SelectedIndex="-1">
         </DataGrid>
         <GridSplitter Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"></GridSplitter>
         <Border Grid.Row="3" BorderBrush="Black" BorderThickness="1"></Border>

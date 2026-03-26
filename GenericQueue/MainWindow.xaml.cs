@@ -56,6 +56,7 @@ namespace GenericQueue
         public int ButtonID;
         public bool AllowProcessAll = true;
         public bool AllowImport = true;
+        private bool IsDemo = false;
 
         public MainWindow()
         {
@@ -84,7 +85,7 @@ namespace GenericQueue
                                 ";User Id=" + username +
                                 ";Password=" + password +
                                 ";Trusted_Connection=False" +
-                                ";Connection Timeout=12000";
+                                ";Connection Timeout=15";
         }
 
         public static SqlConnection ConnectToDB()
@@ -107,20 +108,34 @@ namespace GenericQueue
                 ToTB.Visibility = Visibility.Collapsed;
                 FromDatePicker.Visibility = Visibility.Collapsed;
                 ToDatePicker.Visibility = Visibility.Collapsed;
-                Connection = ConnectToDB();
-                TypeTable = new DataSet();
-                SqlDataAdapter da = new SqlDataAdapter("Select * from dbo.q_Type", Connection);
-                da.SelectCommand.CommandTimeout = 12000;
-                SqlCommandBuilder cmdBuilder = new SqlCommandBuilder(da);
 
-                da.Fill(TypeTable);
-
-                User = Environment.UserName;
-                DataGrid dt = new DataGrid();
-                foreach (DataRow r in TypeTable.Tables[0].Rows)
-                    TypeList.Add(r.ItemArray[1].ToString());
-                TypeDropdown.ItemsSource = TypeList;
-                Connection.Close();
+                try
+                {
+                    Connection = ConnectToDB();
+                    TypeTable = new DataSet();
+                    SqlDataAdapter da = new SqlDataAdapter("Select * from dbo.q_Type", Connection);
+                    da.SelectCommand.CommandTimeout = 30;
+                    SqlCommandBuilder cmdBuilder = new SqlCommandBuilder(da);
+                    da.Fill(TypeTable);
+                    User = Environment.UserName;
+                    DataGrid dt = new DataGrid();
+                    foreach (DataRow r in TypeTable.Tables[0].Rows)
+                        TypeList.Add(r.ItemArray[1].ToString());
+                    TypeDropdown.ItemsSource = TypeList;
+                    Connection.Close();
+                }
+                catch (Exception)
+                {
+                    var result = MessageBox.Show(
+                        "Could not connect to the database. Load demo data instead?",
+                        "Database Unavailable",
+                        MessageBoxButton.YesNo);
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        IsDemo = true;
+                        LoadDemoTypes();
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -137,10 +152,16 @@ namespace GenericQueue
         {
             try
             {
+                if (IsDemo)
+                {
+                    LoadDemoFirstGrid();
+                    GenerateFirstGrid();
+                    return;
+                }
                 FirstDT = new DataTable();
                 Connection.Open();
                 SqlCommand cmd = new SqlCommand("dbo.q_Load_List", Connection);
-                cmd.CommandTimeout = 12000;
+                cmd.CommandTimeout = 30;
                 cmd.CommandType = System.Data.CommandType.StoredProcedure;
                 cmd.Parameters.Add(new SqlParameter("@user", User));
                 cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
@@ -232,6 +253,7 @@ namespace GenericQueue
                         cellTemplate1.Triggers.Add(trig);
                         col1.CellTemplate = cellTemplate1;
                         cellTemplate1.VisualTree = factory1;
+                        col1.CanUserSort = false;
                         FirstGrid.Columns.Add(col1);
                         continue;
                     }
@@ -288,6 +310,7 @@ namespace GenericQueue
                         DataTemplate dataTemplate = new DataTemplate { VisualTree = sb };
                         //dataTemplate.Triggers.Add(trig);
                         dgc.CellTemplate = dataTemplate;
+                        dgc.CanUserSort = false;
                         FirstGrid.Columns.Add(dgc);
                         continue;
                     }
@@ -302,7 +325,7 @@ namespace GenericQueue
                     {
                         DataGridCheckBoxColumn col1 = new DataGridCheckBoxColumn();
                         col1.Header = FirstDT.Columns[i].ColumnName;
-
+                        col1.SortMemberPath = FirstDT.Columns[i].ColumnName;
                         col1.Binding = new Binding(FirstDT.Columns[i].ColumnName);
                         col1.IsReadOnly = true;
                         FirstGrid.Columns.Add(col1);
@@ -312,6 +335,7 @@ namespace GenericQueue
                     {
                         DataGridTextColumn col1 = new DataGridTextColumn();
                         col1.Header = FirstDT.Columns[i].ColumnName;
+                        col1.SortMemberPath = FirstDT.Columns[i].ColumnName;
 
                         Binding colorBinding = new Binding("color");
                         colorBinding.Converter = new ColorConverter();
@@ -371,13 +395,15 @@ namespace GenericQueue
             {
                 ClickedRowID = (int)row.ItemArray[FirstDT.Columns["id"].Ordinal];
                 ClickedContents = row.ItemArray[FirstDT.Columns[ButtonID].Ordinal].ToString();
-                //ClickedContents = row.ItemArray[FirstDT.Columns.Ordinal].ToString();
-                //ClickedRowID = (sender as ExButton).ID;
-                //ClickedContents = (sender as ExButton).Text;
+                if (IsDemo)
+                {
+                    LoadDemoSecondGrid();
+                    return;
+                }
                 SecondDT = new DataTable();
                 Connection.Open();
                 SqlCommand cmd = new SqlCommand("dbo.q_Load_Details", Connection);
-                cmd.CommandTimeout = 12000;
+                cmd.CommandTimeout = 30;
                 cmd.CommandType = System.Data.CommandType.StoredProcedure;
                 cmd.Parameters.Add(new SqlParameter("@user", User));
                 cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
@@ -387,7 +413,6 @@ namespace GenericQueue
                 SecondDT.Load(rdr);
                 backupTwo = SecondDT.Copy();
                 Connection.Close();
-                //GenerateSecondGrid();
             }
             catch (Exception ex)
             {
@@ -521,20 +546,26 @@ namespace GenericQueue
                 //col1.ElementStyle = columnStyle;
                 //.ElementStyle = activeStyle;
                 ClickedContents = (sender as ExButton).Text;
-                SecondDT = new DataTable();
-                Connection.Open();
-                SqlCommand cmd = new SqlCommand("dbo.q_Load_Details", Connection);
-                cmd.CommandTimeout = 12000;
-                cmd.CommandType = System.Data.CommandType.StoredProcedure;
-                cmd.Parameters.Add(new SqlParameter("@user", User));
-                cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
-                cmd.Parameters.Add(new SqlParameter("@id", ClickedRowID));
-                cmd.Parameters.Add(new SqlParameter("@contents", ClickedContents));
-                SqlDataReader rdr = cmd.ExecuteReader();
-                SecondDT.Load(rdr);
-                backupTwo = SecondDT.Copy();
-                Connection.Close();
-
+                if (IsDemo)
+                {
+                    LoadDemoSecondGrid();
+                }
+                else
+                {
+                    SecondDT = new DataTable();
+                    Connection.Open();
+                    SqlCommand cmd = new SqlCommand("dbo.q_Load_Details", Connection);
+                    cmd.CommandTimeout = 30;
+                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                    cmd.Parameters.Add(new SqlParameter("@user", User));
+                    cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
+                    cmd.Parameters.Add(new SqlParameter("@id", ClickedRowID));
+                    cmd.Parameters.Add(new SqlParameter("@contents", ClickedContents));
+                    SqlDataReader rdr = cmd.ExecuteReader();
+                    SecondDT.Load(rdr);
+                    backupTwo = SecondDT.Copy();
+                    Connection.Close();
+                }
                 GenerateSecondGrid();
                 
             }
@@ -866,7 +897,7 @@ namespace GenericQueue
                         ResponseDT = new DataTable();
                         Connection.Open();
                         SqlCommand cmd = new SqlCommand("dbo.q_Save_Details", Connection);
-                        cmd.CommandTimeout = 12000;
+                        cmd.CommandTimeout = 30;
                         cmd.CommandType = System.Data.CommandType.StoredProcedure;
                         cmd.Parameters.Add(new SqlParameter("@user", User));
                         cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
@@ -912,6 +943,11 @@ namespace GenericQueue
             {
                 if (SecondDT == null)
                     return;
+                if (IsDemo)
+                {
+                    MessageBox.Show("Demo mode: changes are not saved to a database.", "Demo Mode");
+                    return;
+                }
                 List<Field> f = new List<Field>();
                 Dictionary<string, string> dic = new Dictionary<string, string>();
                 var childrenEnumerator = FieldsPanel.Children.GetEnumerator();
@@ -997,7 +1033,7 @@ namespace GenericQueue
                         ResponseDT = new DataTable();
                         Connection.Open();
                         SqlCommand cmd = new SqlCommand("dbo.q_Save_Details", Connection);
-                        cmd.CommandTimeout = 12000;
+                        cmd.CommandTimeout = 30;
                         cmd.CommandType = System.Data.CommandType.StoredProcedure;
                         cmd.Parameters.Add(new SqlParameter("@user", User));
                         cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
@@ -1211,7 +1247,7 @@ namespace GenericQueue
                             //-------------------------------
                             FirstDT = new DataTable();
                             SqlCommand cmd = new SqlCommand("dbo.q_Load_Import", Connection);
-                            cmd.CommandTimeout = 12000;
+                            cmd.CommandTimeout = 30;
                             cmd.CommandType = System.Data.CommandType.StoredProcedure;
                             cmd.Parameters.Add(new SqlParameter("@user", User));
                             cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
@@ -1237,6 +1273,90 @@ namespace GenericQueue
                 LogError(e);
             }
         }
+        private void LoadDemoTypes()
+        {
+            User = Environment.UserName;
+            TypeTable = new DataSet();
+            DataTable typeTable = new DataTable();
+            typeTable.Columns.Add("id", typeof(int));
+            typeTable.Columns.Add("type", typeof(string));
+            typeTable.Columns.Add("include_dates", typeof(bool));
+            typeTable.Columns.Add("upload_folder", typeof(string));
+            typeTable.Columns.Add("process_all_flag", typeof(bool));
+            typeTable.Columns.Add("import_flag", typeof(bool));
+            typeTable.Rows.Add(1, "Demo Queue", false, "", false, false);
+            TypeTable.Tables.Add(typeTable);
+            TypeList.Add("Demo Queue");
+            TypeDropdown.ItemsSource = TypeList;
+        }
+
+        private void LoadDemoFirstGrid()
+        {
+            FirstDT = new DataTable();
+            FirstDT.Columns.Add("id", typeof(int));
+            FirstDT.Columns.Add("button_Open", typeof(string));
+            FirstDT.Columns.Add("Name", typeof(string));
+            FirstDT.Columns.Add("Status", typeof(string));
+            FirstDT.Columns.Add("Date", typeof(string));
+            FirstDT.Columns.Add("color", typeof(string));
+
+            FirstDT.Rows.Add(1, "Open", "Alpha Project",    "Pending", "03/15/2026", "");
+            FirstDT.Rows.Add(2, "Open", "Beta Initiative",  "Active",  "03/20/2026", "FFFF99");
+            FirstDT.Rows.Add(3, "Open", "Gamma Task",       "Done",    "03/10/2026", "99FF99");
+            FirstDT.Rows.Add(4, "Open", "Delta Work",       "Pending", "04/01/2026", "");
+            FirstDT.Rows.Add(5, "Open", "Epsilon Item",     "Active",  "03/25/2026", "FFCCCC");
+
+            backupOne = FirstDT.Copy();
+        }
+
+        private void LoadDemoSecondGrid()
+        {
+            var demoRow = FirstDT.Rows.Cast<DataRow>()
+                                      .FirstOrDefault(r => (int)r["id"] == ClickedRowID);
+            if (demoRow == null) return;
+
+            FieldCollection fields = new FieldCollection
+            {
+                Fields = new Field[]
+                {
+                    new Field { Name="name",     Label="Name",     DataType="string", Value=demoRow["Name"].ToString(),          Order=1, ReadOnly=false, ID=1, Color="" },
+                    new Field { Name="status",   Label="Status",   DataType="enum",   Value=demoRow["Status"].ToString().ToLower(), Order=2, ReadOnly=false, ID=2, Color="" },
+                    new Field { Name="date",     Label="Date",     DataType="date",   Value=demoRow["Date"].ToString(),           Order=3, ReadOnly=false, ID=3, Color="" },
+                    new Field { Name="complete", Label="Complete", DataType="bool",   Value="false",                              Order=4, ReadOnly=false, ID=4, Color="" },
+                }
+            };
+            EnumCollection enums = new EnumCollection
+            {
+                Enums = new Enum[]
+                {
+                    new Enum { Name="status", Value="pending", Label="Pending" },
+                    new Enum { Name="status", Value="active",  Label="Active"  },
+                    new Enum { Name="status", Value="done",    Label="Done"    },
+                }
+            };
+
+            string detailsXml, enumsXml;
+            var settings = new System.Xml.XmlWriterSettings { OmitXmlDeclaration = true };
+            using (var sw = new StringWriter())
+            using (var xw = System.Xml.XmlWriter.Create(sw, settings))
+            {
+                new XmlSerializer(typeof(FieldCollection)).Serialize(xw, fields);
+                detailsXml = sw.ToString();
+            }
+            using (var sw = new StringWriter())
+            using (var xw = System.Xml.XmlWriter.Create(sw, settings))
+            {
+                new XmlSerializer(typeof(EnumCollection)).Serialize(xw, enums);
+                enumsXml = sw.ToString();
+            }
+
+            SecondDT = new DataTable();
+            SecondDT.Columns.Add("details", typeof(string));
+            SecondDT.Columns.Add("enums",   typeof(string));
+            SecondDT.Rows.Add(detailsXml, enumsXml);
+            backupTwo = SecondDT.Copy();
+        }
+
     }
 
     static class Helper
