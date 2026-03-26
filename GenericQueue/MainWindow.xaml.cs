@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
@@ -119,6 +119,9 @@ namespace GenericQueue
                 DataGrid dt = new DataGrid();
                 foreach (DataRow r in TypeTable.Tables[0].Rows)
                     TypeList.Add(r.ItemArray[1].ToString());
+#if DEBUG
+                TypeList.Add("--- SIMULATED ---");
+#endif
                 TypeDropdown.ItemsSource = TypeList;
                 Connection.Close();
             }
@@ -232,6 +235,7 @@ namespace GenericQueue
                         cellTemplate1.Triggers.Add(trig);
                         col1.CellTemplate = cellTemplate1;
                         cellTemplate1.VisualTree = factory1;
+                        col1.CanUserSort = false;
                         FirstGrid.Columns.Add(col1);
                         continue;
                     }
@@ -288,6 +292,7 @@ namespace GenericQueue
                         DataTemplate dataTemplate = new DataTemplate { VisualTree = sb };
                         //dataTemplate.Triggers.Add(trig);
                         dgc.CellTemplate = dataTemplate;
+                        dgc.CanUserSort = false;
                         FirstGrid.Columns.Add(dgc);
                         continue;
                     }
@@ -295,6 +300,7 @@ namespace GenericQueue
                     {
                         DataGridTextColumn col1 = new DataGridTextColumn();
                         col1.Visibility = Visibility.Hidden;
+                        col1.CanUserSort = false;
                         FirstGrid.Columns.Add(col1);
                         continue;
                     }
@@ -305,6 +311,7 @@ namespace GenericQueue
 
                         col1.Binding = new Binding(FirstDT.Columns[i].ColumnName);
                         col1.IsReadOnly = true;
+                        col1.CanUserSort = false;
                         FirstGrid.Columns.Add(col1);
                         continue;
                     }
@@ -350,6 +357,8 @@ namespace GenericQueue
                         ////col1.SetValue(DataGridTextColumn.ForegroundProperty, colorBinding);
                         col1.Binding = new Binding(FirstDT.Columns[i].ColumnName);
                         col1.IsReadOnly = true;
+                        col1.CanUserSort = true;
+                        col1.SortMemberPath = FirstDT.Columns[i].ColumnName;
                         FirstGrid.Columns.Add(col1);
                         continue;
                     }
@@ -1102,9 +1111,18 @@ namespace GenericQueue
                     }
 
                 }
+
                 FieldsPanel.Children.Clear();
                 SaveButton.IsEnabled = false;
                 CancelButton.IsEnabled = false;
+
+#if DEBUG
+                if (TypeDropdown.SelectedItem != null && TypeDropdown.SelectedItem.ToString() == "--- SIMULATED ---")
+                {
+                    LoadSimulatedData();
+                    return;
+                }
+#endif
                 //GetFirstGridData();
             }
             catch (Exception ex)
@@ -1113,6 +1131,50 @@ namespace GenericQueue
             }
             GetFirstGridData();
         }
+
+#if DEBUG
+        private void LoadSimulatedData()
+        {
+            try
+            {
+                FirstDT = new DataTable();
+                FirstDT.Columns.Add("id", typeof(int));
+                FirstDT.Columns.Add("color", typeof(string));
+                FirstDT.Columns.Add("Name", typeof(string));
+                FirstDT.Columns.Add("Status", typeof(string));
+                FirstDT.Columns.Add("button_Process", typeof(string));
+                FirstDT.Columns.Add("document_View", typeof(string));
+                FirstDT.Columns.Add("Active", typeof(bool));
+
+                Random rand = new Random();
+                string[] colors = { "White", "LightBlue", "LightGreen", "LightYellow", "Pink" };
+                string[] names = { "John Doe", "Jane Smith", "Bob Jones", "Alice Brown", "Charlie Davis" };
+                string[] statuses = { "Pending", "Active", "Completed", "Error", "On Hold" };
+
+                for (int i = 1; i <= 20; i++)
+                {
+                    DataRow row = FirstDT.NewRow();
+                    row["id"] = i;
+                    row["color"] = colors[rand.Next(colors.Length)];
+                    row["Name"] = names[rand.Next(names.Length)] + " " + i;
+                    row["Status"] = statuses[rand.Next(statuses.Length)];
+                    row["button_Process"] = "Process";
+                    row["document_View"] = "http://example.com/doc/" + i;
+                    row["Active"] = rand.Next(2) == 0;
+                    FirstDT.Rows.Add(row);
+                }
+
+                backupOne = FirstDT.Copy();
+                GenerateFirstGrid();
+                RowsCountTB.Text = FirstGrid.Items.Count.ToString();
+                MessageBox.Show("Loaded 20 simulated rows.");
+            }
+            catch (Exception ex)
+            {
+                LogError(ex);
+            }
+        }
+#endif
 
         private void ProcessAllButton_Click(object sender, RoutedEventArgs e)
         {
