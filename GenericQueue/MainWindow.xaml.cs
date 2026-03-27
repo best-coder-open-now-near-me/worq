@@ -24,7 +24,7 @@ using Microsoft.Win32;
 using System.Collections.Specialized;
 using System.Collections;
 //using Excel = Microsoft.Office.Interop.Excel;
-using Excel;//DataReader;
+//using Excel;//DataReader;
 using CsvHelper;
 
 //known issues:
@@ -381,7 +381,7 @@ namespace GenericQueue
                 }
                 FirstGrid.ItemsSource = FirstDT.DefaultView;
                 RowsCountTB.Text = FirstGrid.Items.Count.ToString();
-
+                BuildFilterPanel();
             }
             catch (Exception ex)
             {
@@ -1273,6 +1273,140 @@ namespace GenericQueue
                 LogError(e);
             }
         }
+        private void BuildFilterPanel()
+        {
+            FilterPanel.Children.Clear();
+            if (FirstDT == null || FirstDT.Columns.Count == 0)
+            {
+                FilterPanel.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            bool hasFilters = false;
+            for (int i = 0; i < FirstDT.Columns.Count; i++)
+            {
+                var col = FirstDT.Columns[i];
+                string name = col.ColumnName;
+                if (name == "id" || name.ToLower() == "color" ||
+                    name.StartsWith("button_") || name.StartsWith("document_"))
+                    continue;
+
+                hasFilters = true;
+
+                if (col.DataType == typeof(DateTime))
+                {
+                    FilterPanel.Children.Add(new TextBlock { Text = name + " From:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 2, 2, 2) });
+                    var fromPicker = new DatePicker { Height = 25, Width = 120, Margin = new Thickness(0, 2, 5, 2), Tag = "from|" + name };
+                    fromPicker.SelectedDateChanged += FilterControl_Changed;
+                    FilterPanel.Children.Add(fromPicker);
+
+                    FilterPanel.Children.Add(new TextBlock { Text = "To:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 2, 2, 2) });
+                    var toPicker = new DatePicker { Height = 25, Width = 120, Margin = new Thickness(0, 2, 10, 2), Tag = "to|" + name };
+                    toPicker.SelectedDateChanged += FilterControl_Changed;
+                    FilterPanel.Children.Add(toPicker);
+                }
+                else if (col.DataType == typeof(bool))
+                {
+                    FilterPanel.Children.Add(new TextBlock { Text = name + ":", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 2, 2, 2) });
+                    var cb = new ComboBox { Height = 25, Width = 80, Margin = new Thickness(0, 2, 10, 2), Tag = "bool|" + name };
+                    cb.Items.Add("All");
+                    cb.Items.Add("True");
+                    cb.Items.Add("False");
+                    cb.SelectedIndex = 0;
+                    cb.SelectionChanged += FilterControl_Changed;
+                    FilterPanel.Children.Add(cb);
+                }
+                else
+                {
+                    FilterPanel.Children.Add(new TextBlock { Text = name + ":", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 2, 2, 2) });
+                    var cb = new ComboBox { Height = 25, MinWidth = 80, Margin = new Thickness(0, 2, 10, 2), Tag = "text|" + name };
+                    cb.Items.Add("All");
+                    foreach (var v in FirstDT.AsEnumerable().Select(r => r[name]?.ToString() ?? "").Distinct().OrderBy(v => v))
+                        cb.Items.Add(v);
+                    cb.SelectedIndex = 0;
+                    cb.SelectionChanged += FilterControl_Changed;
+                    FilterPanel.Children.Add(cb);
+                }
+            }
+
+            if (hasFilters)
+            {
+                var clearBtn = new Button { Content = "Clear Filters", Height = 25, Margin = new Thickness(10, 2, 5, 2) };
+                clearBtn.Click += ClearFilters_Click;
+                FilterPanel.Children.Add(clearBtn);
+                FilterPanel.Visibility = Visibility.Visible;
+            }
+            else
+                FilterPanel.Visibility = Visibility.Collapsed;
+        }
+
+        private void FilterControl_Changed(object sender, EventArgs e)
+        {
+            ApplyFilters();
+        }
+
+        private void ApplyFilters()
+        {
+            try
+            {
+                var filters = new List<string>();
+                foreach (UIElement el in FilterPanel.Children)
+                {
+                    string tag = null;
+                    if (el is ComboBox cb && cb.Tag is string t1) tag = t1;
+                    else if (el is DatePicker dp && dp.Tag is string t2) tag = t2;
+                    else continue;
+
+                    var parts = tag.Split('|');
+                    if (parts.Length != 2) continue;
+                    string kind = parts[0];
+                    string colName = parts[1];
+
+                    if (kind == "text")
+                    {
+                        var selected = ((ComboBox)el).SelectedItem?.ToString();
+                        if (string.IsNullOrEmpty(selected) || selected == "All") continue;
+                        filters.Add($"[{colName}] = '{selected.Replace("'", "''")}'");
+                    }
+                    else if (kind == "bool")
+                    {
+                        var selected = ((ComboBox)el).SelectedItem?.ToString();
+                        if (string.IsNullOrEmpty(selected) || selected == "All") continue;
+                        filters.Add($"[{colName}] = {selected.ToLower()}");
+                    }
+                    else if (kind == "from")
+                    {
+                        var picker = (DatePicker)el;
+                        if (picker.SelectedDate == null) continue;
+                        filters.Add($"[{colName}] >= #{picker.SelectedDate.Value:MM/dd/yyyy}#");
+                    }
+                    else if (kind == "to")
+                    {
+                        var picker = (DatePicker)el;
+                        if (picker.SelectedDate == null) continue;
+                        filters.Add($"[{colName}] <= #{picker.SelectedDate.Value:MM/dd/yyyy}#");
+                    }
+                }
+                FirstDT.DefaultView.RowFilter = string.Join(" AND ", filters);
+                RowsCountTB.Text = FirstGrid.Items.Count.ToString();
+            }
+            catch (Exception ex)
+            {
+                LogError(ex);
+            }
+        }
+
+        private void ClearFilters_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (UIElement el in FilterPanel.Children)
+            {
+                if (el is ComboBox cb) cb.SelectedIndex = 0;
+                else if (el is DatePicker dp) dp.SelectedDate = null;
+            }
+            FirstDT.DefaultView.RowFilter = string.Empty;
+            RowsCountTB.Text = FirstGrid.Items.Count.ToString();
+        }
+
         private void LoadDemoTypes()
         {
             User = Environment.UserName;
