@@ -19,6 +19,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
             <RowDefinition Height="1*"/>
             <RowDefinition Height="5"/>
             <RowDefinition Height="1*"/>
@@ -39,11 +40,12 @@
             <TextBlock Name="ToTB" VerticalAlignment="Center" Margin="15,0,0,0" Visibility="Collapsed">To:</TextBlock>
             <DatePicker Height="25" Text="To:" HorizontalAlignment="Left" Margin="5,0,5,0" Name="ToDatePicker" VerticalAlignment="Center" Visibility="Collapsed"/>
         </StackPanel>
-        <DataGrid x:Name="FirstGrid" Grid.Row="1" SelectionMode="Single" SelectionUnit="FullRow" CanUserAddRows="False" VerticalScrollBarVisibility="Visible" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" IsReadOnly="False" RowDetailsVisibilityMode="VisibleWhenSelected" ItemsSource="{Binding}" EnableRowVirtualization="False" EnableColumnVirtualization="False" AutoGenerateColumns="False" SelectedIndex="-1">
+        <WrapPanel Name="FilterPanel" Grid.Row="1" Orientation="Horizontal" Visibility="Collapsed" Background="#F0F0F0" Margin="2,2,2,2"/>
+        <DataGrid x:Name="FirstGrid" Grid.Row="2" SelectionMode="Single" SelectionUnit="FullRow" CanUserAddRows="False" CanUserSortColumns="True" VerticalScrollBarVisibility="Visible" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" IsReadOnly="False" RowDetailsVisibilityMode="VisibleWhenSelected" ItemsSource="{Binding}" EnableRowVirtualization="False" EnableColumnVirtualization="False" AutoGenerateColumns="False" SelectedIndex="-1">
         </DataGrid>
-        <GridSplitter Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"></GridSplitter>
-        <Border Grid.Row="3" BorderBrush="Black" BorderThickness="1"></Border>
-        <ScrollViewer Name="FieldsPanelScroller" Grid.Row="3" BorderBrush="Black">
+        <GridSplitter Grid.Row="3" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"></GridSplitter>
+        <Border Grid.Row="4" BorderBrush="Black" BorderThickness="1"></Border>
+        <ScrollViewer Name="FieldsPanelScroller" Grid.Row="4" BorderBrush="Black">
             <Grid Name="FieldsPanel" Visibility="Hidden" HorizontalAlignment="Left" VerticalAlignment="Top">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -60,9 +62,15 @@
                 </Border>-->
             </Grid>
         </ScrollViewer>
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Name="SaveButton" HorizontalAlignment="Left" Width="100" Margin="5, 5, 0, 5" Click="Save_Click" IsEnabled="False">Save</Button>
             <Button Name="CancelButton" HorizontalAlignment="Right" Width="100" Margin="5,5,10,5" Click="Cancel_Click" IsEnabled="False">Cancel</Button>
         </StackPanel>
+        <Grid Grid.RowSpan="6" Name="BusyOverlay" Visibility="Collapsed" Background="#88000000" Panel.ZIndex="100">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Name="BusyText" Text="Loading..." Foreground="White" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                <ProgressBar IsIndeterminate="True" Width="220" Height="18"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>
