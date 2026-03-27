@@ -1293,15 +1293,22 @@ namespace GenericQueue
 
                 hasFilters = true;
 
-                if (col.DataType == typeof(DateTime))
+                bool isDateCol = col.DataType == typeof(DateTime) ||
+                    (col.DataType == typeof(string) &&
+                     name.IndexOf("date", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                     FirstDT.AsEnumerable().Select(r => r[name]?.ToString()).Where(v => !string.IsNullOrEmpty(v)).Any(v => DateTime.TryParse(v, out _)));
+
+                if (isDateCol)
                 {
                     FilterPanel.Children.Add(new TextBlock { Text = name + " From:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 2, 2, 2) });
-                    var fromPicker = new DatePicker { Height = 25, Width = 120, Margin = new Thickness(0, 2, 5, 2), Tag = "from|" + name };
+                    string dateKind = col.DataType == typeof(DateTime) ? "fromdt" : "fromstr";
+                    var fromPicker = new DatePicker { Height = 25, Width = 120, Margin = new Thickness(0, 2, 5, 2), Tag = dateKind + "|" + name };
                     fromPicker.SelectedDateChanged += FilterControl_Changed;
                     FilterPanel.Children.Add(fromPicker);
 
                     FilterPanel.Children.Add(new TextBlock { Text = "To:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 2, 2, 2) });
-                    var toPicker = new DatePicker { Height = 25, Width = 120, Margin = new Thickness(0, 2, 10, 2), Tag = "to|" + name };
+                    string toKind = col.DataType == typeof(DateTime) ? "todt" : "tostr";
+                    var toPicker = new DatePicker { Height = 25, Width = 120, Margin = new Thickness(0, 2, 10, 2), Tag = toKind + "|" + name };
                     toPicker.SelectedDateChanged += FilterControl_Changed;
                     FilterPanel.Children.Add(toPicker);
                 }
@@ -1374,17 +1381,29 @@ namespace GenericQueue
                         if (string.IsNullOrEmpty(selected) || selected == "All") continue;
                         filters.Add($"[{colName}] = {selected.ToLower()}");
                     }
-                    else if (kind == "from")
+                    else if (kind == "fromdt")
                     {
                         var picker = (DatePicker)el;
                         if (picker.SelectedDate == null) continue;
                         filters.Add($"[{colName}] >= #{picker.SelectedDate.Value:MM/dd/yyyy}#");
                     }
-                    else if (kind == "to")
+                    else if (kind == "todt")
                     {
                         var picker = (DatePicker)el;
                         if (picker.SelectedDate == null) continue;
                         filters.Add($"[{colName}] <= #{picker.SelectedDate.Value:MM/dd/yyyy}#");
+                    }
+                    else if (kind == "fromstr")
+                    {
+                        var picker = (DatePicker)el;
+                        if (picker.SelectedDate == null) continue;
+                        filters.Add($"Convert([{colName}], System.DateTime) >= #{picker.SelectedDate.Value:MM/dd/yyyy}#");
+                    }
+                    else if (kind == "tostr")
+                    {
+                        var picker = (DatePicker)el;
+                        if (picker.SelectedDate == null) continue;
+                        filters.Add($"Convert([{colName}], System.DateTime) <= #{picker.SelectedDate.Value:MM/dd/yyyy}#");
                     }
                 }
                 FirstDT.DefaultView.RowFilter = string.Join(" AND ", filters);
@@ -1431,14 +1450,14 @@ namespace GenericQueue
             FirstDT.Columns.Add("button_Open", typeof(string));
             FirstDT.Columns.Add("Name", typeof(string));
             FirstDT.Columns.Add("Status", typeof(string));
-            FirstDT.Columns.Add("Date", typeof(string));
+            FirstDT.Columns.Add("Date", typeof(DateTime));
             FirstDT.Columns.Add("color", typeof(string));
 
-            FirstDT.Rows.Add(1, "Open", "Alpha Project",    "Pending", "03/15/2026", "");
-            FirstDT.Rows.Add(2, "Open", "Beta Initiative",  "Active",  "03/20/2026", "FFFF99");
-            FirstDT.Rows.Add(3, "Open", "Gamma Task",       "Done",    "03/10/2026", "99FF99");
-            FirstDT.Rows.Add(4, "Open", "Delta Work",       "Pending", "04/01/2026", "");
-            FirstDT.Rows.Add(5, "Open", "Epsilon Item",     "Active",  "03/25/2026", "FFCCCC");
+            FirstDT.Rows.Add(1, "Open", "Alpha Project",    "Pending", new DateTime(2026, 3, 15), "");
+            FirstDT.Rows.Add(2, "Open", "Beta Initiative",  "Active",  new DateTime(2026, 3, 20), "FFFF99");
+            FirstDT.Rows.Add(3, "Open", "Gamma Task",       "Done",    new DateTime(2026, 3, 10), "99FF99");
+            FirstDT.Rows.Add(4, "Open", "Delta Work",       "Pending", new DateTime(2026, 4,  1), "");
+            FirstDT.Rows.Add(5, "Open", "Epsilon Item",     "Active",  new DateTime(2026, 3, 25), "FFCCCC");
 
             backupOne = FirstDT.Copy();
         }
