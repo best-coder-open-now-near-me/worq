@@ -57,6 +57,7 @@ namespace GenericQueue
         public bool AllowProcessAll = true;
         public bool AllowImport = true;
         private bool IsDemo = false;
+        private Dictionary<string, string> _savedFilterValues = null;
 
         public MainWindow()
         {
@@ -1347,6 +1348,18 @@ namespace GenericQueue
         }
         private void BuildFilterPanel()
         {
+            // Snapshot current filter values before rebuilding
+            var snapshot = new Dictionary<string, string>();
+            foreach (UIElement el in FilterPanel.Children)
+            {
+                if (el is ComboBox cb && cb.Tag is string t1)
+                    snapshot[t1] = cb.SelectedItem?.ToString() ?? "";
+                else if (el is DatePicker dp && dp.Tag is string t2)
+                    snapshot[t2] = dp.SelectedDate?.ToString("o") ?? "";
+            }
+            if (snapshot.Count > 0)
+                _savedFilterValues = snapshot;
+
             FilterPanel.Children.Clear();
             if (FirstDT == null || FirstDT.Columns.Count == 0)
             {
@@ -1417,6 +1430,25 @@ namespace GenericQueue
             }
             else
                 FilterPanel.Visibility = Visibility.Collapsed;
+
+            // Restore saved filter values if present
+            if (_savedFilterValues != null)
+            {
+                foreach (UIElement el in FilterPanel.Children)
+                {
+                    if (el is ComboBox cb && cb.Tag is string t1 && _savedFilterValues.TryGetValue(t1, out var cbVal))
+                    {
+                        if (cb.Items.Contains(cbVal))
+                            cb.SelectedItem = cbVal;
+                    }
+                    else if (el is DatePicker dp && dp.Tag is string t2 && _savedFilterValues.TryGetValue(t2, out var dpVal))
+                    {
+                        if (DateTime.TryParse(dpVal, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
+                            dp.SelectedDate = dt;
+                    }
+                }
+                _savedFilterValues = null; // consume — prevents stale restore on next unrelated rebuild
+            }
         }
 
         private void FilterControl_Changed(object sender, EventArgs e)
@@ -1489,6 +1521,7 @@ namespace GenericQueue
 
         private void ClearFilters_Click(object sender, RoutedEventArgs e)
         {
+            _savedFilterValues = null; // prevent restore on next rebuild
             foreach (UIElement el in FilterPanel.Children)
             {
                 if (el is ComboBox cb) cb.SelectedIndex = 0;
