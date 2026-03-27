@@ -1236,7 +1236,7 @@ namespace GenericQueue
             }
         }
 
-        private void AllowImportButton_Click(object sender, RoutedEventArgs e)
+        private async void AllowImportButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -1246,13 +1246,13 @@ namespace GenericQueue
                 var result = dialog.ShowDialog();
                 if ((bool)result)
                 {
-                    ProcessImport(dialog.FileName);
+                    await ProcessImportAsync(dialog.FileName);
                 }
             }
             catch (Exception ex) { LogError(ex); }
         }
 
-        private void ProcessImport(string fileName)
+        private async Task ProcessImportAsync(string fileName)
         {
             try
             {
@@ -1331,7 +1331,7 @@ namespace GenericQueue
 
                             Connection.Close();
 
-                            GetFirstGridData();
+                            await GetFirstGridDataAsync();
                         }
                         catch (Exception e)
                         {
