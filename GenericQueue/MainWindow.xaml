@@ -66,5 +66,11 @@
             <Button Name="SaveButton" HorizontalAlignment="Left" Width="100" Margin="5, 5, 0, 5" Click="Save_Click" IsEnabled="False">Save</Button>
             <Button Name="CancelButton" HorizontalAlignment="Right" Width="100" Margin="5,5,10,5" Click="Cancel_Click" IsEnabled="False">Cancel</Button>
         </StackPanel>
+        <Grid Grid.RowSpan="6" Name="BusyOverlay" Visibility="Collapsed" Background="#88000000" Panel.ZIndex="100">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Name="BusyText" Text="Loading..." Foreground="White" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,12"/>
+                <ProgressBar IsIndeterminate="True" Width="220" Height="18"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>
