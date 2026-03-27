@@ -24,7 +24,7 @@ using Microsoft.Win32;
 using System.Collections.Specialized;
 using System.Collections;
 //using Excel = Microsoft.Office.Interop.Excel;
-//using Excel;//DataReader;
+using Excel;//DataReader;
 using CsvHelper;
 
 //known issues:
@@ -56,7 +56,6 @@ namespace GenericQueue
         public int ButtonID;
         public bool AllowProcessAll = true;
         public bool AllowImport = true;
-        private bool IsDemo = false;
 
         public MainWindow()
         {
@@ -85,7 +84,7 @@ namespace GenericQueue
                                 ";User Id=" + username +
                                 ";Password=" + password +
                                 ";Trusted_Connection=False" +
-                                ";Connection Timeout=15";
+                                ";Connection Timeout=12000";
         }
 
         public static SqlConnection ConnectToDB()
@@ -97,64 +96,34 @@ namespace GenericQueue
             return Connection;
         }
 
-        private void SetBusy(bool busy, string message = "Loading...")
-        {
-            BusyOverlay.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
-            BusyText.Text = message;
-            FillButton.IsEnabled = !busy && TypeDropdown.SelectedIndex >= 0;
-            TypeDropdown.IsEnabled = !busy;
-        }
-
-        private async void Window_Loaded(object sender, RoutedEventArgs e)
+        private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
                 DeselectedIndex = -1;
                 SelectedIndex = -1;
+                //GetMainWindow = this;
                 FromTB.Visibility = Visibility.Collapsed;
                 ToTB.Visibility = Visibility.Collapsed;
                 FromDatePicker.Visibility = Visibility.Collapsed;
                 ToDatePicker.Visibility = Visibility.Collapsed;
+                Connection = ConnectToDB();
+                TypeTable = new DataSet();
+                SqlDataAdapter da = new SqlDataAdapter("Select * from dbo.q_Type", Connection);
+                da.SelectCommand.CommandTimeout = 12000;
+                SqlCommandBuilder cmdBuilder = new SqlCommandBuilder(da);
 
-                SetBusy(true, "Connecting...");
-                try
-                {
-                    var loaded = await Task.Run(() =>
-                    {
-                        var cs = AcquireConnectString();
-                        using (var c = new SqlConnection(cs))
-                        {
-                            c.Open();
-                            var ds = new DataSet();
-                            var da = new SqlDataAdapter("Select * from dbo.q_Type", c);
-                            da.SelectCommand.CommandTimeout = 30;
-                            da.Fill(ds);
-                            return Tuple.Create(ds, Environment.UserName, cs);
-                        }
-                    });
-                    TypeTable = loaded.Item1;
-                    User = loaded.Item2;
-                    Connection = new SqlConnection(loaded.Item3);
-                    foreach (DataRow r in TypeTable.Tables[0].Rows)
-                        TypeList.Add(r.ItemArray[1].ToString());
-                    TypeDropdown.ItemsSource = TypeList;
-                }
-                catch (Exception)
-                {
-                    var result = MessageBox.Show(
-                        "Could not connect to the database. Load demo data instead?",
-                        "Database Unavailable",
-                        MessageBoxButton.YesNo);
-                    if (result == MessageBoxResult.Yes)
-                    {
-                        IsDemo = true;
-                        LoadDemoTypes();
-                    }
-                }
-                finally
-                {
-                    SetBusy(false);
-                }
+                da.Fill(TypeTable);
+
+                User = Environment.UserName;
+                DataGrid dt = new DataGrid();
+                foreach (DataRow r in TypeTable.Tables[0].Rows)
+                    TypeList.Add(r.ItemArray[1].ToString());
+#if DEBUG
+                TypeList.Add("--- SIMULATED ---");
+#endif
+                TypeDropdown.ItemsSource = TypeList;
+                Connection.Close();
             }
             catch (Exception ex)
             {
@@ -167,54 +136,32 @@ namespace GenericQueue
             FillButton.IsEnabled = true;
         }
 
-        private async Task GetFirstGridDataAsync()
+        private void GetFirstGridData()
         {
-            if (IsDemo)
-            {
-                LoadDemoFirstGrid();
-                GenerateFirstGrid();
-                return;
-            }
-
-            var type = TypeDropdown.Items[ActiveTypeIndex].ToString();
-            var user = User;
-            var date1 = FromDatePicker.SelectedDate;
-            var date2 = ToDatePicker.SelectedDate;
-            var connStr = Connection.ConnectionString;
-
-            SetBusy(true, "Loading...");
             try
             {
-                var dt = await Task.Run(() =>
-                {
-                    using (var c = new SqlConnection(connStr))
-                    {
-                        c.Open();
-                        var result = new DataTable();
-                        var cmd = new SqlCommand("dbo.q_Load_List", c);
-                        cmd.CommandTimeout = 30;
-                        cmd.CommandType = System.Data.CommandType.StoredProcedure;
-                        cmd.Parameters.Add(new SqlParameter("@user", user));
-                        cmd.Parameters.Add(new SqlParameter("@type", type));
-                        if (date1 != null)
-                            cmd.Parameters.Add(new SqlParameter("@date1", date1.ToString()));
-                        if (date2 != null)
-                            cmd.Parameters.Add(new SqlParameter("@date2", date2.ToString()));
-                        result.Load(cmd.ExecuteReader());
-                        return result;
-                    }
-                });
-                FirstDT = dt;
+                FirstDT = new DataTable();
+                Connection.Open();
+                SqlCommand cmd = new SqlCommand("dbo.q_Load_List", Connection);
+                cmd.CommandTimeout = 12000;
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.Parameters.Add(new SqlParameter("@user", User));
+                cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
+                if (FromDatePicker.SelectedDate != null)
+                    cmd.Parameters.Add(new SqlParameter("@date1", FromDatePicker.SelectedDate.ToString()));
+                if (ToDatePicker.SelectedDate != null)
+                    cmd.Parameters.Add(new SqlParameter("@date2", ToDatePicker.SelectedDate.ToString()));
+                SqlDataReader rdr = cmd.ExecuteReader();
+                FirstDT.Load(rdr);
                 backupOne = FirstDT.Copy();
+                Connection.Close();
+
                 GenerateFirstGrid();
+                
             }
             catch (Exception ex)
             {
                 LogError(ex);
-            }
-            finally
-            {
-                SetBusy(false);
             }
         }
 
@@ -361,7 +308,7 @@ namespace GenericQueue
                     {
                         DataGridCheckBoxColumn col1 = new DataGridCheckBoxColumn();
                         col1.Header = FirstDT.Columns[i].ColumnName;
-                        col1.SortMemberPath = FirstDT.Columns[i].ColumnName;
+
                         col1.Binding = new Binding(FirstDT.Columns[i].ColumnName);
                         col1.IsReadOnly = true;
                         col1.CanUserSort = false;
@@ -372,7 +319,6 @@ namespace GenericQueue
                     {
                         DataGridTextColumn col1 = new DataGridTextColumn();
                         col1.Header = FirstDT.Columns[i].ColumnName;
-                        col1.SortMemberPath = FirstDT.Columns[i].ColumnName;
 
                         Binding colorBinding = new Binding("color");
                         colorBinding.Converter = new ColorConverter();
@@ -420,7 +366,7 @@ namespace GenericQueue
                 }
                 FirstGrid.ItemsSource = FirstDT.DefaultView;
                 RowsCountTB.Text = FirstGrid.Items.Count.ToString();
-                BuildFilterPanel();
+
             }
             catch (Exception ex)
             {
@@ -434,15 +380,13 @@ namespace GenericQueue
             {
                 ClickedRowID = (int)row.ItemArray[FirstDT.Columns["id"].Ordinal];
                 ClickedContents = row.ItemArray[FirstDT.Columns[ButtonID].Ordinal].ToString();
-                if (IsDemo)
-                {
-                    LoadDemoSecondGrid();
-                    return;
-                }
+                //ClickedContents = row.ItemArray[FirstDT.Columns.Ordinal].ToString();
+                //ClickedRowID = (sender as ExButton).ID;
+                //ClickedContents = (sender as ExButton).Text;
                 SecondDT = new DataTable();
                 Connection.Open();
                 SqlCommand cmd = new SqlCommand("dbo.q_Load_Details", Connection);
-                cmd.CommandTimeout = 30;
+                cmd.CommandTimeout = 12000;
                 cmd.CommandType = System.Data.CommandType.StoredProcedure;
                 cmd.Parameters.Add(new SqlParameter("@user", User));
                 cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
@@ -452,6 +396,7 @@ namespace GenericQueue
                 SecondDT.Load(rdr);
                 backupTwo = SecondDT.Copy();
                 Connection.Close();
+                //GenerateSecondGrid();
             }
             catch (Exception ex)
             {
@@ -460,7 +405,7 @@ namespace GenericQueue
 
         }
 
-        private async void DG_Button_Click(object sender, RoutedEventArgs e)
+        private void DG_Button_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -585,51 +530,21 @@ namespace GenericQueue
                 //col1.ElementStyle = columnStyle;
                 //.ElementStyle = activeStyle;
                 ClickedContents = (sender as ExButton).Text;
-                if (IsDemo)
-                {
-                    LoadDemoSecondGrid();
-                    GenerateSecondGrid();
-                }
-                else
-                {
-                    var user = User;
-                    var type = TypeDropdown.Items[ActiveTypeIndex].ToString();
-                    var id = ClickedRowID;
-                    var contents = ClickedContents;
-                    var connStr = Connection.ConnectionString;
-                    SetBusy(true, "Loading details...");
-                    try
-                    {
-                        var dt = await Task.Run(() =>
-                        {
-                            using (var c = new SqlConnection(connStr))
-                            {
-                                c.Open();
-                                var result = new DataTable();
-                                var cmd = new SqlCommand("dbo.q_Load_Details", c);
-                                cmd.CommandTimeout = 30;
-                                cmd.CommandType = System.Data.CommandType.StoredProcedure;
-                                cmd.Parameters.Add(new SqlParameter("@user", user));
-                                cmd.Parameters.Add(new SqlParameter("@type", type));
-                                cmd.Parameters.Add(new SqlParameter("@id", id));
-                                cmd.Parameters.Add(new SqlParameter("@contents", contents));
-                                result.Load(cmd.ExecuteReader());
-                                return result;
-                            }
-                        });
-                        SecondDT = dt;
-                        backupTwo = SecondDT.Copy();
-                        GenerateSecondGrid();
-                    }
-                    catch (Exception ex)
-                    {
-                        LogError(ex);
-                    }
-                    finally
-                    {
-                        SetBusy(false);
-                    }
-                }
+                SecondDT = new DataTable();
+                Connection.Open();
+                SqlCommand cmd = new SqlCommand("dbo.q_Load_Details", Connection);
+                cmd.CommandTimeout = 12000;
+                cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                cmd.Parameters.Add(new SqlParameter("@user", User));
+                cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
+                cmd.Parameters.Add(new SqlParameter("@id", ClickedRowID));
+                cmd.Parameters.Add(new SqlParameter("@contents", ClickedContents));
+                SqlDataReader rdr = cmd.ExecuteReader();
+                SecondDT.Load(rdr);
+                backupTwo = SecondDT.Copy();
+                Connection.Close();
+
+                GenerateSecondGrid();
                 
             }
             catch (Exception ex)
@@ -960,7 +875,7 @@ namespace GenericQueue
                         ResponseDT = new DataTable();
                         Connection.Open();
                         SqlCommand cmd = new SqlCommand("dbo.q_Save_Details", Connection);
-                        cmd.CommandTimeout = 30;
+                        cmd.CommandTimeout = 12000;
                         cmd.CommandType = System.Data.CommandType.StoredProcedure;
                         cmd.Parameters.Add(new SqlParameter("@user", User));
                         cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
@@ -1000,134 +915,116 @@ namespace GenericQueue
             }
         }
 
-        private List<Field> CollectFieldValues()
-        {
-            var f = new List<Field>();
-            var childrenEnumerator = FieldsPanel.Children.GetEnumerator();
-            while (childrenEnumerator.MoveNext())
-            {
-                var current = childrenEnumerator.Current;
-                var c = Grid.GetColumn(current as UIElement);
-                var r = Grid.GetRow(current as UIElement);
-                if (r != 0)
-                {
-                    if (r > OrderedFields.Count)
-                        continue;
-                    if (c == 1)
-                    {
-                        DependencyProperty dp = TextBlock.TextProperty;
-                        var chi = (current as Border).Child;
-                        string v = string.Empty;
-                        if (chi.GetType().Name.Equals(typeof(ComboBox).Name))
-                        {
-                            dp = ComboBox.SelectedValueProperty;
-                            v = (chi.GetValue(dp) as Enum)?.Value?.ToString();
-                        }
-                        else if (chi.GetType().Name.Equals(typeof(CheckBox).Name))
-                        {
-                            dp = CheckBox.IsCheckedProperty;
-                            v = chi.GetValue(dp)?.ToString();
-                        }
-                        else if (chi.GetType().Name.Equals(typeof(DatePicker).Name))
-                        {
-                            dp = DatePicker.SelectedDateProperty;
-                            var i = ((DateTime)chi.GetValue(dp));
-                            v = i != null ? i.Date != null ? i.Date.ToString("MM/dd/yyyy") : "" : "";
-                        }
-                        else if (chi.GetType().Name.Equals(typeof(StackPanel).Name))
-                        {
-                            var hl = (chi as StackPanel).Children.OfType<TextBlock>().FirstOrDefault();
-                            if (hl == null)
-                                continue;
-                            v = (hl.Inlines.FirstInline as Hyperlink)?.NavigateUri?.ToString().Replace("/", "\\").Remove(0, 5);
-                            Regex rgx = new Regex(@"[A-Z]:\\");
-                            if (!string.IsNullOrEmpty(v))
-                            {
-                                var result = rgx.Match(v, 0);
-                                if (result != null && result.Success)
-                                    v = v.Remove(0, result.Index);
-                            }
-                        }
-                        else
-                        {
-                            var fieldtest = OrderedFields.ElementAt<Field>(r - 1);
-                            if (!fieldtest.ReadOnly)
-                                dp = TextBox.TextProperty;
-                            v = chi.GetValue(dp)?.ToString();
-                        }
-
-                        var field = OrderedFields.ElementAt<Field>(r - 1);
-                        field.Value = v ?? "";
-                        f.Add(field);
-                    }
-                }
-            }
-            return f;
-        }
-
-        private async void Save_Click(object sender, RoutedEventArgs e)
+        private void Save_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 if (SecondDT == null)
                     return;
-                if (IsDemo)
+                List<Field> f = new List<Field>();
+                Dictionary<string, string> dic = new Dictionary<string, string>();
+                var childrenEnumerator = FieldsPanel.Children.GetEnumerator();
+                while (childrenEnumerator.MoveNext())
                 {
-                    MessageBox.Show("Demo mode: changes are not saved to a database.", "Demo Mode");
-                    return;
-                }
-
-                var fields = CollectFieldValues();
-                var type = TypeDropdown.Items[ActiveTypeIndex].ToString();
-                var clickedRowId = ClickedRowID;
-                var clickedContents = ClickedContents;
-                var user = User;
-                var connStr = Connection.ConnectionString;
-
-                SetBusy(true, "Saving...");
-                Tuple<string, bool> saveResult = null;
-                try
-                {
-                    saveResult = await Task.Run(() =>
+                    var current = childrenEnumerator.Current;
+                    var c = Grid.GetColumn(current as UIElement);
+                    var r = Grid.GetRow(current as UIElement);
+                    if (r != 0)
                     {
-                        string xml;
-                        using (var sw = new StringWriter())
-                        using (var xw = XmlWriter.Create(sw))
+                        if (r > OrderedFields.Count)
+                            continue;
+                        if (c == 1)
                         {
-                            new XmlSerializer(typeof(FieldCollection)).Serialize(xw, new FieldCollection { Fields = fields.ToArray() });
-                            xml = sw.ToString();
+                            DependencyProperty dp = TextBlock.TextProperty;
+                            var chi = (current as Border).Child;
+                            string v = string.Empty;
+                            if (chi.GetType().Name.Equals(typeof(ComboBox).Name))
+                            {
+                                dp = ComboBox.SelectedValueProperty;
+                                v = (chi.GetValue(dp) as Enum)?.Value?.ToString();
+                            }
+                            else if (chi.GetType().Name.Equals(typeof(CheckBox).Name))
+                            {
+                                dp = CheckBox.IsCheckedProperty;
+                                v = chi.GetValue(dp)?.ToString();
+                            }
+                            else if (chi.GetType().Name.Equals(typeof(DatePicker).Name))
+                            {
+                                dp = DatePicker.SelectedDateProperty;
+                                var i = ((DateTime)chi.GetValue(dp));
+                                v = i != null ? i.Date != null ? i.Date.ToString("MM/dd/yyyy") : "" : "";
+                            }
+                            else if (chi.GetType().Name.Equals(typeof(StackPanel).Name))
+                            {
+                                var hl = (chi as StackPanel).Children.OfType<TextBlock>().FirstOrDefault();
+                                if (hl == null)
+                                    continue;
+                                v = (hl.Inlines.FirstInline as Hyperlink)?.NavigateUri?.ToString().Replace("/", "\\").Remove(0, 5);
+                                Regex rgx = new Regex(@"[A-Z]:\\");
+
+                                if (!string.IsNullOrEmpty(v))
+                                {
+                                    var result = rgx.Match(v, 0);
+                                    string rem = string.Empty;
+                                    if (result != null && result.Success == true)
+                                    {
+                                        rem = v.Remove(0, result.Index);
+                                        v = rem;
+                                    }
+
+                                }
+
+                            }
+                            else
+                            {
+                                var fieldtest = OrderedFields.ElementAt<Field>(r - 1);
+                                if (!fieldtest.ReadOnly)
+                                    dp = TextBox.TextProperty;
+                                v = chi.GetValue(dp)?.ToString();
+                            }
+
+                            var field = OrderedFields.ElementAt<Field>(r - 1);
+                            field.Value = v != null ? v : "";
+                            f.Add(field);
                         }
-                        using (var c = new SqlConnection(connStr))
-                        {
-                            c.Open();
-                            var cmd = new SqlCommand("dbo.q_Save_Details", c);
-                            cmd.CommandTimeout = 30;
-                            cmd.CommandType = System.Data.CommandType.StoredProcedure;
-                            cmd.Parameters.Add(new SqlParameter("@user", user));
-                            cmd.Parameters.Add(new SqlParameter("@type", type));
-                            cmd.Parameters.Add(new SqlParameter("@id", clickedRowId));
-                            cmd.Parameters.Add(new SqlParameter("@contents", clickedContents));
-                            cmd.Parameters.Add(new SqlParameter("@xml", xml));
-                            var dt = new DataTable();
-                            dt.Load(cmd.ExecuteReader());
-                            return Tuple.Create(dt.Rows[0][1]?.ToString(), "True".Equals(dt.Rows[0][0]?.ToString()));
-                        }
-                    });
-                }
-                catch (Exception ex)
-                {
-                    LogError(ex);
-                }
-                finally
-                {
-                    SetBusy(false);
+
+                    }
+
                 }
 
-                if (saveResult == null) return;
-                if (!string.IsNullOrEmpty(saveResult.Item1))
-                    MessageBox.Show(saveResult.Item1);
-                if (saveResult.Item2)
-                    await GetFirstGridDataAsync();
+                using (var sww = new StringWriter())
+                {
+                    using (XmlWriter writer = XmlWriter.Create(sww))
+                    {
+                        ResponseDT = new DataTable();
+                        FieldCollection c = new FieldCollection();
+                        c.Fields = f.ToArray();
+                        XmlSerializer serializer = new XmlSerializer(typeof(FieldCollection));
+                        serializer.Serialize(writer, c);
+                        var x = sww.ToString();
+
+                        ResponseDT = new DataTable();
+                        Connection.Open();
+                        SqlCommand cmd = new SqlCommand("dbo.q_Save_Details", Connection);
+                        cmd.CommandTimeout = 12000;
+                        cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                        cmd.Parameters.Add(new SqlParameter("@user", User));
+                        cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
+                        cmd.Parameters.Add(new SqlParameter("@id", ClickedRowID));
+                        cmd.Parameters.Add(new SqlParameter("@contents", ClickedContents));
+                        cmd.Parameters.Add(new SqlParameter("@xml", x));
+                        SqlDataReader rdr = cmd.ExecuteReader();
+                        ResponseDT.Load(rdr);
+                        Connection.Close();
+                    }
+
+                }
+                var message = ResponseDT.Rows[0][1].ToString();
+                if (!string.IsNullOrEmpty(message))
+                    MessageBox.Show(message);
+                var refresh = ResponseDT.Rows[0][0].ToString();
+                if (refresh.Equals("True"))
+                    GetFirstGridData();
             }
             catch (Exception ex)
             {
@@ -1172,7 +1069,7 @@ namespace GenericQueue
             }
         }
 
-        private async void FillButton_Click(object sender, RoutedEventArgs e)
+        private void FillButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -1232,7 +1129,7 @@ namespace GenericQueue
             {
                 LogError(ex);
             }
-            await GetFirstGridDataAsync();
+            GetFirstGridData();
         }
 
 #if DEBUG
@@ -1376,7 +1273,7 @@ namespace GenericQueue
                             //-------------------------------
                             FirstDT = new DataTable();
                             SqlCommand cmd = new SqlCommand("dbo.q_Load_Import", Connection);
-                            cmd.CommandTimeout = 30;
+                            cmd.CommandTimeout = 12000;
                             cmd.CommandType = System.Data.CommandType.StoredProcedure;
                             cmd.Parameters.Add(new SqlParameter("@user", User));
                             cmd.Parameters.Add(new SqlParameter("@type", TypeDropdown.Items[ActiveTypeIndex].ToString()));
@@ -1402,243 +1299,6 @@ namespace GenericQueue
                 LogError(e);
             }
         }
-        private void BuildFilterPanel()
-        {
-            FilterPanel.Children.Clear();
-            if (FirstDT == null || FirstDT.Columns.Count == 0)
-            {
-                FilterPanel.Visibility = Visibility.Collapsed;
-                return;
-            }
-
-            bool hasFilters = false;
-            for (int i = 0; i < FirstDT.Columns.Count; i++)
-            {
-                var col = FirstDT.Columns[i];
-                string name = col.ColumnName;
-                if (name == "id" || name.ToLower() == "color" ||
-                    name.StartsWith("button_") || name.StartsWith("document_"))
-                    continue;
-
-                hasFilters = true;
-
-                bool isDateCol = col.DataType == typeof(DateTime) ||
-                    (col.DataType == typeof(string) &&
-                     name.IndexOf("date", StringComparison.OrdinalIgnoreCase) >= 0 &&
-                     FirstDT.AsEnumerable().Select(r => r[name]?.ToString()).Where(v => !string.IsNullOrEmpty(v)).Any(v => DateTime.TryParse(v, out _)));
-
-                if (isDateCol)
-                {
-                    FilterPanel.Children.Add(new TextBlock { Text = name + " From:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 2, 2, 2) });
-                    string dateKind = col.DataType == typeof(DateTime) ? "fromdt" : "fromstr";
-                    var fromPicker = new DatePicker { Height = 25, Width = 120, Margin = new Thickness(0, 2, 5, 2), Tag = dateKind + "|" + name };
-                    fromPicker.SelectedDateChanged += FilterControl_Changed;
-                    FilterPanel.Children.Add(fromPicker);
-
-                    FilterPanel.Children.Add(new TextBlock { Text = "To:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 2, 2, 2) });
-                    string toKind = col.DataType == typeof(DateTime) ? "todt" : "tostr";
-                    var toPicker = new DatePicker { Height = 25, Width = 120, Margin = new Thickness(0, 2, 10, 2), Tag = toKind + "|" + name };
-                    toPicker.SelectedDateChanged += FilterControl_Changed;
-                    FilterPanel.Children.Add(toPicker);
-                }
-                else if (col.DataType == typeof(bool))
-                {
-                    FilterPanel.Children.Add(new TextBlock { Text = name + ":", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 2, 2, 2) });
-                    var cb = new ComboBox { Height = 25, Width = 80, Margin = new Thickness(0, 2, 10, 2), Tag = "bool|" + name };
-                    cb.Items.Add("All");
-                    cb.Items.Add("True");
-                    cb.Items.Add("False");
-                    cb.SelectedIndex = 0;
-                    cb.SelectionChanged += FilterControl_Changed;
-                    FilterPanel.Children.Add(cb);
-                }
-                else
-                {
-                    FilterPanel.Children.Add(new TextBlock { Text = name + ":", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 2, 2, 2) });
-                    var cb = new ComboBox { Height = 25, MinWidth = 80, Margin = new Thickness(0, 2, 10, 2), Tag = "text|" + name };
-                    cb.Items.Add("All");
-                    foreach (var v in FirstDT.AsEnumerable().Select(r => r[name]?.ToString() ?? "").Distinct().OrderBy(v => v))
-                        cb.Items.Add(v);
-                    cb.SelectedIndex = 0;
-                    cb.SelectionChanged += FilterControl_Changed;
-                    FilterPanel.Children.Add(cb);
-                }
-            }
-
-            if (hasFilters)
-            {
-                var clearBtn = new Button { Content = "Clear Filters", Height = 25, Margin = new Thickness(10, 2, 5, 2) };
-                clearBtn.Click += ClearFilters_Click;
-                FilterPanel.Children.Add(clearBtn);
-                FilterPanel.Visibility = Visibility.Visible;
-            }
-            else
-                FilterPanel.Visibility = Visibility.Collapsed;
-        }
-
-        private void FilterControl_Changed(object sender, EventArgs e)
-        {
-            ApplyFilters();
-        }
-
-        private void ApplyFilters()
-        {
-            try
-            {
-                var filters = new List<string>();
-                foreach (UIElement el in FilterPanel.Children)
-                {
-                    string tag = null;
-                    if (el is ComboBox cb && cb.Tag is string t1) tag = t1;
-                    else if (el is DatePicker dp && dp.Tag is string t2) tag = t2;
-                    else continue;
-
-                    var parts = tag.Split('|');
-                    if (parts.Length != 2) continue;
-                    string kind = parts[0];
-                    string colName = parts[1];
-
-                    if (kind == "text")
-                    {
-                        var selected = ((ComboBox)el).SelectedItem?.ToString();
-                        if (string.IsNullOrEmpty(selected) || selected == "All") continue;
-                        filters.Add($"[{colName}] = '{selected.Replace("'", "''")}'");
-                    }
-                    else if (kind == "bool")
-                    {
-                        var selected = ((ComboBox)el).SelectedItem?.ToString();
-                        if (string.IsNullOrEmpty(selected) || selected == "All") continue;
-                        filters.Add($"[{colName}] = {selected.ToLower()}");
-                    }
-                    else if (kind == "fromdt")
-                    {
-                        var picker = (DatePicker)el;
-                        if (picker.SelectedDate == null) continue;
-                        filters.Add($"[{colName}] >= #{picker.SelectedDate.Value:MM/dd/yyyy}#");
-                    }
-                    else if (kind == "todt")
-                    {
-                        var picker = (DatePicker)el;
-                        if (picker.SelectedDate == null) continue;
-                        filters.Add($"[{colName}] <= #{picker.SelectedDate.Value:MM/dd/yyyy}#");
-                    }
-                    else if (kind == "fromstr")
-                    {
-                        var picker = (DatePicker)el;
-                        if (picker.SelectedDate == null) continue;
-                        filters.Add($"Convert([{colName}], System.DateTime) >= #{picker.SelectedDate.Value:MM/dd/yyyy}#");
-                    }
-                    else if (kind == "tostr")
-                    {
-                        var picker = (DatePicker)el;
-                        if (picker.SelectedDate == null) continue;
-                        filters.Add($"Convert([{colName}], System.DateTime) <= #{picker.SelectedDate.Value:MM/dd/yyyy}#");
-                    }
-                }
-                FirstDT.DefaultView.RowFilter = string.Join(" AND ", filters);
-                RowsCountTB.Text = FirstGrid.Items.Count.ToString();
-            }
-            catch (Exception ex)
-            {
-                LogError(ex);
-            }
-        }
-
-        private void ClearFilters_Click(object sender, RoutedEventArgs e)
-        {
-            foreach (UIElement el in FilterPanel.Children)
-            {
-                if (el is ComboBox cb) cb.SelectedIndex = 0;
-                else if (el is DatePicker dp) dp.SelectedDate = null;
-            }
-            FirstDT.DefaultView.RowFilter = string.Empty;
-            RowsCountTB.Text = FirstGrid.Items.Count.ToString();
-        }
-
-        private void LoadDemoTypes()
-        {
-            User = Environment.UserName;
-            TypeTable = new DataSet();
-            DataTable typeTable = new DataTable();
-            typeTable.Columns.Add("id", typeof(int));
-            typeTable.Columns.Add("type", typeof(string));
-            typeTable.Columns.Add("include_dates", typeof(bool));
-            typeTable.Columns.Add("upload_folder", typeof(string));
-            typeTable.Columns.Add("process_all_flag", typeof(bool));
-            typeTable.Columns.Add("import_flag", typeof(bool));
-            typeTable.Rows.Add(1, "Demo Queue", false, "", false, false);
-            TypeTable.Tables.Add(typeTable);
-            TypeList.Add("Demo Queue");
-            TypeDropdown.ItemsSource = TypeList;
-        }
-
-        private void LoadDemoFirstGrid()
-        {
-            FirstDT = new DataTable();
-            FirstDT.Columns.Add("id", typeof(int));
-            FirstDT.Columns.Add("button_Open", typeof(string));
-            FirstDT.Columns.Add("Name", typeof(string));
-            FirstDT.Columns.Add("Status", typeof(string));
-            FirstDT.Columns.Add("Date", typeof(DateTime));
-            FirstDT.Columns.Add("color", typeof(string));
-
-            FirstDT.Rows.Add(1, "Open", "Alpha Project",    "Pending", new DateTime(2026, 3, 15), "");
-            FirstDT.Rows.Add(2, "Open", "Beta Initiative",  "Active",  new DateTime(2026, 3, 20), "FFFF99");
-            FirstDT.Rows.Add(3, "Open", "Gamma Task",       "Done",    new DateTime(2026, 3, 10), "99FF99");
-            FirstDT.Rows.Add(4, "Open", "Delta Work",       "Pending", new DateTime(2026, 4,  1), "");
-            FirstDT.Rows.Add(5, "Open", "Epsilon Item",     "Active",  new DateTime(2026, 3, 25), "FFCCCC");
-
-            backupOne = FirstDT.Copy();
-        }
-
-        private void LoadDemoSecondGrid()
-        {
-            var demoRow = FirstDT.Rows.Cast<DataRow>()
-                                      .FirstOrDefault(r => (int)r["id"] == ClickedRowID);
-            if (demoRow == null) return;
-
-            FieldCollection fields = new FieldCollection
-            {
-                Fields = new Field[]
-                {
-                    new Field { Name="name",     Label="Name",     DataType="string", Value=demoRow["Name"].ToString(),          Order=1, ReadOnly=false, ID=1, Color="" },
-                    new Field { Name="status",   Label="Status",   DataType="enum",   Value=demoRow["Status"].ToString().ToLower(), Order=2, ReadOnly=false, ID=2, Color="" },
-                    new Field { Name="date",     Label="Date",     DataType="date",   Value=demoRow["Date"].ToString(),           Order=3, ReadOnly=false, ID=3, Color="" },
-                    new Field { Name="complete", Label="Complete", DataType="bool",   Value="false",                              Order=4, ReadOnly=false, ID=4, Color="" },
-                }
-            };
-            EnumCollection enums = new EnumCollection
-            {
-                Enums = new Enum[]
-                {
-                    new Enum { Name="status", Value="pending", Label="Pending" },
-                    new Enum { Name="status", Value="active",  Label="Active"  },
-                    new Enum { Name="status", Value="done",    Label="Done"    },
-                }
-            };
-
-            string detailsXml, enumsXml;
-            var settings = new System.Xml.XmlWriterSettings { OmitXmlDeclaration = true };
-            using (var sw = new StringWriter())
-            using (var xw = System.Xml.XmlWriter.Create(sw, settings))
-            {
-                new XmlSerializer(typeof(FieldCollection)).Serialize(xw, fields);
-                detailsXml = sw.ToString();
-            }
-            using (var sw = new StringWriter())
-            using (var xw = System.Xml.XmlWriter.Create(sw, settings))
-            {
-                new XmlSerializer(typeof(EnumCollection)).Serialize(xw, enums);
-                enumsXml = sw.ToString();
-            }
-
-            SecondDT = new DataTable();
-            SecondDT.Columns.Add("details", typeof(string));
-            SecondDT.Columns.Add("enums",   typeof(string));
-            SecondDT.Rows.Add(detailsXml, enumsXml);
-            backupTwo = SecondDT.Copy();
-        }
-
     }
 
     static class Helper
